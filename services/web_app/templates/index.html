@@ -2,142 +2,251 @@
 
 {% block content %}
 
-<div class="tab-pane-grid">
-    <div class="controls-panel">
-        <form id="ocr-form">
-            <div class="form-group">
-                <div class="form-group file-drop-zone">
-                    <label for="input-file">Upload PDF, TIFF, or Image:</label>
-                    <input type="file" id="input-file" name="input_file" accept=".pdf,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff" required>
-                    <div class="drop-zone-text">Drag & drop PDF, TIFF, or Image here</div>
-                </div>
-            </div>
-            {# Output Format Dropdown #}
-            <div class="form-group">
-                <label for="output-format-select">Output Format:</label>
-                <select id="output-format-select" name="output_format" required>
-                    <option value="text">Plain text</option>
-                    <option value="markdown" selected>Markdown</option>
-                    <option value="HTML">HTML</option>
-                </select>
-            </div>
+<!-- Tab Navigation -->
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link active" id="single-file-tab-link" data-bs-toggle="tab" href="#single-file-pane" role="tab" aria-controls="single-file-pane" aria-selected="true">Single File OCR</a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" id="batch-process-tab-link" data-bs-toggle="tab" href="#batch-process-pane" role="tab" aria-controls="batch-process-pane" aria-selected="false">Batch Processing</a>
+    </li>
+</ul>
+<!-- End of Tab Navigation -->
 
-            <div class="form-group">
-                <label for="vlm-api-select">Choose VLM API:</label>
-                <select id="vlm-api-select" name="vlm_api" required>
-                    <option value="" disabled selected>-- select VLM API --</option>
-                    {% for api in vlm_api_options %}
-                        <option value="{{ api.value }}">{{ api.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
 
-            <div id="openai-compatible-options" class="conditional-options indented-option" style="display: none;">
-                <div class="form-group">
-                    <label for="openai-compatible-api-key">API Key:</label> <input type="password" id="openai-compatible-api-key" name="openai_compatible_api_key" placeholder="Enter API key for the compatible endpoint" class="api-input">
-                </div>
-                <div class="form-group">
-                    <label for="vlm-base-url">Base URL:</label>
-                    <input type="url" id="vlm-base-url" name="vlm_base_url" placeholder="e.g., http://localhost:8000/v1" class="api-input">
-                </div>
-                <div class="form-group">
-                    <label for="vlm-model">Model:</label>
-                    <input type="text" id="vlm-model" name="vlm_model" placeholder="e.g., Qwen/Qwen2.5-VL-7B-Instruct" class="api-input">
-                </div>
-            </div>
+<!-- Tab Content -->
+<div class="tab-content" id="myTabContent">
 
-            <div id="openai-options" class="conditional-options indented-option" style="display: none;">
-                 <div class="form-group">
-                    <label for="openai-api-key">OpenAI API Key:</label>
-                    <input type="password" id="openai-api-key" name="openai_api_key" placeholder="Enter your OpenAI API key" class="api-input">
-                </div>
-                <div class="form-group">
-                    <label for="openai-model">Model:</label>
-                    <input type="text" id="openai-model" name="openai_model" placeholder="e.g., gpt-4o" class="api-input">
-                </div>
-            </div>
-
-            <div id="azure-openai-options" class="conditional-options indented-option" style="display: none;">
-                <div class="form-group">
-                    <label for="azure-openai-api-key">Azure API Key:</label>
-                    <input type="password" id="azure-openai-api-key" name="azure_openai_api_key" placeholder="Enter your Azure API key" class="api-input">
-                </div>
-                <div class="form-group">
-                    <label for="azure-endpoint">Azure OpenAI Endpoint:</label>
-                    <input type="url" id="azure-endpoint" name="azure_endpoint" placeholder="e.g., https://YOUR_RESOURCE_NAME.openai.azure.com/" class="api-input">
-                </div>
-                 <div class="form-group">
-                    <label for="azure-api-version">Azure API Version:</label> <input type="text" id="azure-api-version" name="azure_api_version" placeholder="e.g., 2024-02-01" class="api-input">
-                 </div>
-                <div class="form-group">
-                    <label for="azure-deployment-name">Model / Deployment Name:</label>
-                    <input type="text" id="azure-deployment-name" name="azure_deployment_name" placeholder="Enter deployment name used in Azure" class="api-input">
-                </div>
-            </div>
-
-            <div id="ollama-options" class="conditional-options indented-option" style="display: none;">
-                <div class="form-group">
-                    <label for="ollama-host">Host:</label>
-                    <input type="url" id="ollama-host" name="ollama_host" placeholder="Default: http://localhost:11434" value="http://localhost:11434" class="api-input">
-                </div>
-                <div class="form-group">
-                    <label for="ollama-model">Model:</label>
-                    <input type="text" id="ollama-model" name="ollama_model" placeholder="Enter Ollama model name (e.g., llama3.2-vision)" class="api-input">
-                </div>
-            </div>
-
-            {# MODIFIED: Collapsible Advanced OCR Settings Section #}
-            <details class="form-group">
-                <summary style="cursor: pointer; font-weight: bold; margin-bottom: 10px;">Advanced OCR Settings</summary>
-                <div class="indented-option">
-                    <div class="form-group">
-                        <label for="ocr-user-prompt">User Prompt (Optional Context):</label>
-                        <textarea id="ocr-user-prompt" name="user_prompt" rows="3" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
+    <!-- ========================== -->
+    <!-- == Single File Tab Pane == -->
+    <!-- ========================== -->
+    <div class="tab-pane fade show active" id="single-file-pane" role="tabpanel" aria-labelledby="single-file-tab-link">
+        <div class="tab-pane-grid">
+            <!-- Left Control Panel -->
+            <div class="controls-panel">
+                <form id="ocr-form">
+                    <div class="form-group file-drop-zone">
+                        <label for="input-file">Upload PDF, TIFF, or Image:</label>
+                        <input type="file" id="input-file" name="input_file" accept=".pdf,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff" required>
+                        <div class="drop-zone-text">Drag & drop file here</div>
                     </div>
                     <div class="form-group">
-                        <label for="max-new-tokens">Max New Tokens:</label>
-                        <input type="number" id="max-new-tokens" name="max_new_tokens" value="4096" min="1" class="api-input">
+                        <label for="output-format-select">Output Format:</label>
+                        <select id="output-format-select" name="output_format" required>
+                            <option value="text">Plain text</option>
+                            <option value="markdown" selected>Markdown</option>
+                            <option value="HTML">HTML</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label for="temperature">Temperature:</label>
-                        <input type="number" id="temperature" name="temperature" value="0.0" min="0" max="2" step="0.1" class="api-input">
+                        <label for="vlm-api-select">Choose VLM API:</label>
+                        <select id="vlm-api-select" name="vlm_api" required>
+                            <option value="" disabled selected>-- select VLM API --</option>
+                            {% for api in vlm_api_options %}
+                                <option value="{{ api.value }}">{{ api.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Conditional Options for Single File Form -->
+                    <div id="openai-compatible-options" class="conditional-options indented-option" style="display: none;">
+                        <div class="form-group">
+                            <label for="openai-compatible-api-key">API Key:</label>
+                            <input type="password" id="openai-compatible-api-key" name="openai_compatible_api_key" placeholder="Enter API key if required" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="vlm-base-url">Base URL:</label>
+                            <input type="url" id="vlm-base-url" name="vlm_base_url" placeholder="e.g., http://localhost:8000/v1" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="vlm-model">Model:</label>
+                            <input type="text" id="vlm-model" name="vlm_model" placeholder="e.g., Qwen/Qwen2.5-VL-7B-Instruct" class="api-input">
+                        </div>
+                    </div>
+                    <div id="openai-options" class="conditional-options indented-option" style="display: none;">
+                         <div class="form-group">
+                            <label for="openai-api-key">OpenAI API Key:</label>
+                            <input type="password" id="openai-api-key" name="openai_api_key" placeholder="Enter your OpenAI API key" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="openai-model">Model:</label>
+                            <input type="text" id="openai-model" name="openai_model" placeholder="e.g., gpt-4o" class="api-input">
+                        </div>
+                    </div>
+                    <div id="azure-openai-options" class="conditional-options indented-option" style="display: none;">
+                        <div class="form-group">
+                            <label for="azure-openai-api-key">Azure API Key:</label>
+                            <input type="password" id="azure-openai-api-key" name="azure_openai_api_key" placeholder="Enter your Azure API key" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="azure-endpoint">Azure OpenAI Endpoint:</label>
+                            <input type="url" id="azure-endpoint" name="azure_endpoint" placeholder="e.g., https://YOUR_RESOURCE_NAME.openai.azure.com/" class="api-input">
+                        </div>
+                         <div class="form-group">
+                            <label for="azure-api-version">Azure API Version:</label> <input type="text" id="azure-api-version" name="azure_api_version" placeholder="e.g., 2024-02-01" class="api-input">
+                         </div>
+                        <div class="form-group">
+                            <label for="azure-deployment-name">Model / Deployment Name:</label>
+                            <input type="text" id="azure-deployment-name" name="azure_deployment_name" placeholder="Enter deployment name used in Azure" class="api-input">
+                        </div>
+                    </div>
+                    <div id="ollama-options" class="conditional-options indented-option" style="display: none;">
+                        <div class="form-group">
+                            <label for="ollama-host">Host:</label>
+                            <input type="url" id="ollama-host" name="ollama_host" placeholder="Default: http://localhost:11434" value="http://localhost:11434" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="ollama-model">Model:</label>
+                            <input type="text" id="ollama-model" name="ollama_model" placeholder="Enter Ollama model name (e.g., llama3.2-vision)" class="api-input">
+                        </div>
+                    </div>
+                    <!-- End Conditional Options -->
+
+                    <button type="submit" id="run-ocr-button">Run OCR</button>
+                </form>
+            </div>
+            <!-- Right Display Panel -->
+            <div class="display-panel">
+                <div class="display-column">
+                    <h3>Input Preview</h3>
+                    <div id="input-preview-area" class="output-box">
+                       <p id="preview-placeholder" class="ocr-status-message">Upload a file to see the preview</p>
+                   </div>
+               </div>
+                <div class="display-column">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                        <h3>Extracted Text</h3>
+                        <div id="ocr-toggle-container" style="display: none; align-items: center;">
+                            <label class="switch" title="Toggle Markdown Preview">
+                                <input type="checkbox" id="ocr-render-toggle-checkbox" checked> <span class="slider round"></span>
+                            </label>
+                            <i class="fab fa-markdown" id="preview-icon" style="font-size: 1.5em; margin-left: 10px; color: #ccc;" title="Markdown Preview"></i>
+                        </div>
+                    </div>
+                    <div id="ocr-output-wrapper">
+                         <div id="output-header" class="output-header" style="display: none;">
+                            <div class="header-icons">
+                               <i id="copy-ocr-text" class="fas fa-copy action-icon" title="Copy Raw Text"></i>
+                           </div>
+                       </div>
+                        <div id="ocr-output-area" class="output-box">
+                            <p class="ocr-status-message">OCR results will appear here once a file is processed.</p>
+                        </div>
                     </div>
                 </div>
-            </details>
-            {# END MODIFICATION #}
-
-            <button type="submit" id="run-ocr-button">Run OCR</button>
-        </form>
+            </div>
+        </div>
     </div>
-    <div class="display-panel">
-        <div class="display-column">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
-                 <h3>Input Preview</h3>
-                 <span></span> </div>
-            <div id="input-preview-area" class="output-box">
-               <p id="preview-placeholder" class="ocr-status-message" style="color: #ccc;">Upload a file to see the preview</p>
-           </div>
-       </div>
-        <div class="display-column">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
-                <h3>Extracted Text</h3>
-                <div id="ocr-toggle-container" style="display: none; align-items: center;">
-                    <label class="switch" title="Toggle Markdown Preview">
-                        <input type="checkbox" id="ocr-render-toggle-checkbox" checked> <span class="slider round"></span>
-                    </label>
-                    <i class="fab fa-markdown" id="preview-icon" style="font-size: 1.5em; margin-left: 10px; color: #ccc;" title="Markdown Preview"></i>
-                </div>
+    <!-- End of Single File Tab Pane -->
+
+
+    <!-- =============================== -->
+    <!-- == Batch Processing Tab Pane == -->
+    <!-- =============================== -->
+    <div class="tab-pane fade" id="batch-process-pane" role="tabpanel" aria-labelledby="batch-process-tab-link">
+        <div class="tab-pane-grid">
+             <!-- Left Control Panel (for Batch) -->
+            <div class="controls-panel">
+                <form id="batch-ocr-form">
+                    <div class="form-group file-drop-zone">
+                        <label for="batch-input-file">Upload Multiple Files:</label>
+                        <input type="file" id="batch-input-file" name="batch_input_files" accept=".pdf,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff" required multiple>
+                        <div class="drop-zone-text">Drag & drop files here</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="batch-output-format-select">Output Format:</label>
+                        <select id="batch-output-format-select" name="output_format" required>
+                            <option value="text">Plain text</option>
+                            <option value="markdown" selected>Markdown</option>
+                            <option value="HTML">HTML</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="batch-vlm-api-select">Choose VLM API:</label>
+                        <select id="batch-vlm-api-select" name="vlm_api" required>
+                             <option value="" disabled selected>-- select VLM API --</option>
+                            {% for api in vlm_api_options %}
+                                <option value="{{ api.value }}">{{ api.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Conditional Options for Batch Form -->
+                    <div id="batch-openai-compatible-options" class="conditional-options indented-option" style="display: none;">
+                        <div class="form-group">
+                            <label for="batch-openai-compatible-api-key">API Key:</label>
+                            <input type="password" id="batch-openai-compatible-api-key" name="openai_compatible_api_key" placeholder="Enter API key if required" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="batch-vlm-base-url">Base URL:</label>
+                            <input type="url" id="batch-vlm-base-url" name="vlm_base_url" placeholder="e.g., http://localhost:8000/v1" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="batch-vlm-model">Model:</label>
+                            <input type="text" id="batch-vlm-model" name="vlm_model" placeholder="e.g., Qwen/Qwen2.5-VL-7B-Instruct" class="api-input">
+                        </div>
+                    </div>
+                    <div id="batch-openai-options" class="conditional-options indented-option" style="display: none;">
+                         <div class="form-group">
+                            <label for="batch-openai-api-key">OpenAI API Key:</label>
+                            <input type="password" id="batch-openai-api-key" name="openai_api_key" placeholder="Enter your OpenAI API key" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="batch-openai-model">Model:</label>
+                            <input type="text" id="batch-openai-model" name="openai_model" placeholder="e.g., gpt-4o" class="api-input">
+                        </div>
+                    </div>
+                    <div id="batch-azure-openai-options" class="conditional-options indented-option" style="display: none;">
+                        <div class="form-group">
+                            <label for="batch-azure-openai-api-key">Azure API Key:</label>
+                            <input type="password" id="batch-azure-openai-api-key" name="azure_openai_api_key" placeholder="Enter your Azure API key" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="batch-azure-endpoint">Azure OpenAI Endpoint:</label>
+                            <input type="url" id="batch-azure-endpoint" name="azure_endpoint" placeholder="e.g., https://YOUR_RESOURCE_NAME.openai.azure.com/" class="api-input">
+                        </div>
+                         <div class="form-group">
+                            <label for="batch-azure-api-version">Azure API Version:</label> <input type="text" id="batch-azure-api-version" name="azure_api_version" placeholder="e.g., 2024-02-01" class="api-input">
+                         </div>
+                        <div class="form-group">
+                            <label for="batch-azure-deployment-name">Model / Deployment Name:</label>
+                            <input type="text" id="batch-azure-deployment-name" name="azure_deployment_name" placeholder="Enter deployment name used in Azure" class="api-input">
+                        </div>
+                    </div>
+                    <div id="batch-ollama-options" class="conditional-options indented-option" style="display: none;">
+                        <div class="form-group">
+                            <label for="batch-ollama-host">Host:</label>
+                            <input type="url" id="batch-ollama-host" name="ollama_host" placeholder="Default: http://localhost:11434" value="http://localhost:11434" class="api-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="batch-ollama-model">Model:</label>
+                            <input type="text" id="batch-ollama-model" name="ollama_model" placeholder="Enter Ollama model name (e.g., llama3.2-vision)" class="api-input">
+                        </div>
+                    </div>
+                    <!-- End Conditional Options -->
+
+                    <button type="submit" id="run-batch-ocr-button">Run Batch OCR</button>
+                </form>
             </div>
-            <div id="ocr-output-wrapper">
-                <div id="output-header" class="output-header" style="display: none;">
-                     <div class="header-icons">
-                        <i id="copy-ocr-text" class="fas fa-copy action-icon" title="Copy Raw Text"></i>
+            <!-- Right Display Panel (split into 2 columns for batch) -->
+            <div class="display-panel">
+                <div class="display-column">
+                    <h3>Input File List</h3>
+                    <div id="batch-input-file-list-area" class="output-box">
+                       <p class="ocr-status-message">Uploaded files will be listed here.</p>
                     </div>
                 </div>
-                <div id="ocr-output-area" class="output-box">
-                    <p class="ocr-status-message">OCR results will appear here once a file is processed.</p>
+                <div class="display-column">
+                    <h3>Output Files</h3>
+                    <div id="batch-output-file-list-area" class="output-box">
+                        <p class="ocr-status-message">Downloadable output files will appear here after processing.</p>
+                    </div>
                 </div>
             </div>
-            </div>
+        </div>
     </div>
-</div> {% endblock %}
+    <!-- End of Batch Processing Tab Pane -->
+
+</div>
+<!-- End of Tab Content -->
+{% endblock %}
