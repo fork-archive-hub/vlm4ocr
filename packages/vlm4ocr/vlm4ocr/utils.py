@@ -2,11 +2,14 @@ import abc
 import os
 import io
 import base64
-from typing import Union, List, Tuple
+from typing import Dict, List, Tuple
+import json
+import json_repair
 import importlib.util
 from pdf2image import convert_from_path, pdfinfo_from_path
 from PIL import Image
 import asyncio
+import warnings
 
 
 class DataLoader(abc.ABC):
@@ -229,6 +232,55 @@ def clean_markdown(text:str) -> str:
     cleaned_text = text.replace("```markdown", "").replace("```", "")
     return cleaned_text
 
+def _find_dict_strings( text: str) -> List[str]:
+    """
+    Extracts balanced JSON-like dictionaries from a string, even if nested.
+
+    Parameters:
+    -----------
+    text : str
+        the input text containing JSON-like structures.
+
+    Returns : List[str]
+        A list of valid JSON-like strings representing dictionaries.
+    """
+    open_brace = 0
+    start = -1
+    json_objects = []
+
+    for i, char in enumerate(text):
+        if char == '{':
+            if open_brace == 0:
+                # start of a new JSON object
+                start = i 
+            open_brace += 1
+        elif char == '}':
+            open_brace -= 1
+            if open_brace == 0 and start != -1:
+                json_objects.append(text[start:i + 1])
+                start = -1
+
+    return json_objects
+
+def extract_json(gen_text:str) -> List[Dict[str, str]]:
+    """ 
+    This method inputs a generated text and output a JSON of information tuples
+    """
+    out = []
+    dict_str_list = _find_dict_strings(gen_text)
+    for dict_str in dict_str_list:
+        try:
+            dict_obj = json.loads(dict_str)
+            out.append(dict_obj)
+        except json.JSONDecodeError:
+            dict_obj = json_repair.repair_json(dict_str, skip_json_loads=True, return_objects=True)
+            if dict_obj:
+                warnings.warn(f'JSONDecodeError detected, fixed with repair_json:\n{dict_str}', RuntimeWarning)
+                out.append(dict_obj)
+            else:
+                warnings.warn(f'JSONDecodeError could not be fixed:\n{dict_str}', RuntimeWarning)
+    return out
+
 def get_default_page_delimiter(output_mode:str) -> str:
     """ 
     Returns the default page delimiter based on the environment variable.
@@ -243,14 +295,16 @@ def get_default_page_delimiter(output_mode:str) -> str:
     str
         The default page delimiter.
     """
-    if output_mode not in ["markdown", "HTML", "text"]:
-        raise ValueError("output_mode must be 'markdown', 'HTML', or 'text'")
+    if output_mode not in ["markdown", "HTML", "text", "JSON"]:
+        raise ValueError("output_mode must be 'markdown', 'HTML', 'text', or 'JSON'")
     
     if output_mode == "markdown":
         return "\n\n---\n\n"
     elif output_mode == "HTML":
         return "<br><br>"
     elif output_mode == "text":
+        return "\n\n---\n\n"
+    elif output_mode == "JSON":
         return "\n\n---\n\n"
 
 

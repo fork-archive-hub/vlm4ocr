@@ -28,7 +28,7 @@ pdf_path = "/examples/synthesized_data/GPT-4o_synthesized_note_1.pdf"
 # Define OCR engine
 ocr = OCREngine(vlm_engine, output_mode="markdown")
 ```
-
+### Full text OCR
 #### Run OCR sequentially 
 We run OCR sequentially (process one image at a time) for single or multiple files. This approach is suitable for testing or processing small-scaled requests.
 
@@ -65,6 +65,64 @@ async def run_ocr():
             ocr_text = result.to_string()
             with open(f"{filename}.md", "w", encoding="utf-8") as f:
                 f.write(ocr_text)
+
+asyncio.run(run_ocr())
+```
+
+### Key information extraction with JSON
+In some use cases, we are only interested in a specific set of key information from the OCR results. Processing the entire OCR text is inefficient. We can directly extract the key information using the `output_mode="JSON"`. To use the JSON extraction feature, a custom user prompt that defines the JSON structure is required. The example below demonstrates how to extract key information from images and PDFs. 
+
+#### Run OCR sequentially 
+
+```python
+import json
+
+user_prompt = """
+Your output should include keys: "Patient", "MRN". 
+For example:
+{
+    "Patient": "John Doe",
+    "MRN": "12345"
+}
+"""
+
+ocr = OCREngine(vlm_engine=vlm, output_mode="JSON", user_prompt=user_prompt)
+ocr_results = ocr.sequential_ocr([image_path_1, image_path_2], verbose=True)
+
+for result in ocr_results:
+    for page_num, page in enumerate(result.pages):
+        print(json.loads(page['text']))
+        with open(f"{result.filename}_page_{page_num}.json", "w", encoding="utf-8") as f:
+            json.dump(json.loads(page['text']), f, indent=4)
+```
+
+#### Run OCR concurrently 
+
+```python
+import asyncio
+import json
+
+user_prompt = """
+Your output should include keys: "Patient", "MRN". 
+For example:
+{
+    "Patient": "John Doe",
+    "MRN": "12345"
+}
+"""
+ocr = OCREngine(vlm_engine=vlm, output_mode="JSON", user_prompt=user_prompt)
+
+async def run_ocr():
+    response = ocr.concurrent_ocr([image_path_1, image_path_2], concurrent_batch_size=4)
+    async for result in response:
+        if result.status == "success":
+            filename = result.filename
+            for page_num, page in enumerate(result.pages):
+                with open(f"{filename}_page_{page_num}.json", "w", encoding="utf-8") as f:
+                    json.dump(json.loads(page['text']), f, indent=4)
+                print(f"Saved {filename}_page_{page_num}.json")
+        else:
+            print(f"Error processing {result.filename}: {result.error}")
 
 asyncio.run(run_ocr())
 ```

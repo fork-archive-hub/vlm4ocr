@@ -19,6 +19,41 @@ vlm = OpenAIVLMEngine(model="o3-mini", config=OpenAIReasoningVLMConfig(reasoning
 """ Azure OpenAI """
 vlm = AzureOpenAIVLMEngine(model="gpt-4-turbo", api_version="<api_version>")
 
-""" run OCR """
+""" Full text OCR """
 ocr = OCREngine(vlm_engine=vlm, output_mode="markdown")
 ocr_results = ocr.sequential_ocr([image_path_1, image_path_2], max_dimension_pixels=512, verbose=True)
+
+""" JSON output """
+
+user_prompt = """
+Your output should include keys: "Patient", "MRN". 
+For example:
+{
+    "Patient": "John Doe",
+    "MRN": "12345"
+}
+"""
+
+ocr = OCREngine(vlm_engine=vlm, output_mode="JSON", user_prompt=user_prompt)
+ocr_results = ocr.sequential_ocr([image_path_1, image_path_2], max_dimension_pixels=512, verbose=True)
+
+import json
+for result in ocr_results:
+    for page in result.pages:
+        print(json.loads(page['text']))
+
+import os
+import asyncio
+async def run_ocr():
+    response = ocr.concurrent_ocr([image_path_1, image_path_2], concurrent_batch_size=4)
+    async for result in response:
+        if result.status == "success":
+            filename = result.filename
+            for page_num, page in enumerate(result.pages):
+                with open(os.path.join("/home/daviden1013/David_projects/vlm4ocr", f"{filename}_page_{page_num}.json"), "w", encoding="utf-8") as f:
+                    json.dump(json.loads(page['text']), f, indent=4)
+                print(f"Saved {filename}_page_{page_num}.json")
+        else:
+            print(f"Error processing {result.filename}: {result.error}")
+
+asyncio.run(run_ocr())

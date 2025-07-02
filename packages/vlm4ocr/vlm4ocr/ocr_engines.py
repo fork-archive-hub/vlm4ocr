@@ -3,8 +3,8 @@ from typing import Tuple, List, Dict, Union, Generator, AsyncGenerator, Iterable
 import importlib
 import asyncio
 from colorama import Fore, Style   
-from PIL import Image
-from vlm4ocr.utils import DataLoader, PDFDataLoader, TIFFDataLoader, ImageDataLoader, ImageProcessor, clean_markdown, get_default_page_delimiter
+import json
+from vlm4ocr.utils import DataLoader, PDFDataLoader, TIFFDataLoader, ImageDataLoader, ImageProcessor, clean_markdown, extract_json, get_default_page_delimiter
 from vlm4ocr.data_types import OCRResult
 from vlm4ocr.vlm_engines import VLMEngine
 
@@ -21,7 +21,7 @@ class OCREngine:
         inference_engine : InferenceEngine
             The inference engine to use for OCR.
         output_mode : str, Optional
-            The output format. Must be 'markdown', 'HTML', or 'text'.
+            The output format. Must be 'markdown', 'HTML', 'text', or 'JSON'.
         system_prompt : str, Optional
             Custom system prompt. We recommend use a default system prompt by leaving this blank. 
         user_prompt : str, Optional
@@ -33,8 +33,8 @@ class OCREngine:
         self.vlm_engine = vlm_engine
 
         # Check output mode
-        if output_mode not in ["markdown", "HTML", "text"]:
-            raise ValueError("output_mode must be 'markdown', 'HTML', or 'text'")
+        if output_mode not in ["markdown", "HTML", "text", "JSON"]:
+            raise ValueError("output_mode must be 'markdown', 'HTML', 'text', or 'JSON'.")
         self.output_mode = output_mode
 
         # System prompt
@@ -49,6 +49,9 @@ class OCREngine:
         if isinstance(user_prompt, str) and user_prompt:
             self.user_prompt = user_prompt
         else:
+            if self.output_mode == "JSON":
+                raise ValueError("user_prompt must be provided when output_mode is 'JSON' to define the JSON structure.")
+
             prompt_template_path = importlib.resources.files('vlm4ocr.assets.default_prompt_templates').joinpath(f'ocr_{self.output_mode}_user_prompt.txt')
             with prompt_template_path.open('r', encoding='utf-8') as f:
                 self.user_prompt =  f.read()
@@ -276,6 +279,12 @@ class OCREngine:
                     # Clean the response if output mode is markdown
                     if self.output_mode == "markdown":
                         response = clean_markdown(response)
+
+                    # Parse the response if output mode is JSON
+                    if self.output_mode == "JSON":
+                        json_list = extract_json(response)
+                        # Serialize the JSON list to a string
+                        response = json.dumps(json_list, indent=4)
                     
                     # Add the page to the OCR result
                     ocr_result.add_page(text=response, 
@@ -470,6 +479,14 @@ class OCREngine:
             ocr_text = await self.vlm_engine.chat_async( 
                 messages,
             )
+            # Clean the OCR text if output mode is markdown
             if self.output_mode == "markdown":
                 ocr_text = clean_markdown(ocr_text)
+
+            # Parse the response if output mode is JSON
+            if self.output_mode == "JSON":
+                json_list = extract_json(ocr_text)
+                # Serialize the JSON list to a string
+                ocr_text = json.dumps(json_list, indent=4)
+
             return ocr_text, image_processing_status

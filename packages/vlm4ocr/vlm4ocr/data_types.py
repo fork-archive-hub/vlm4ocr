@@ -3,7 +3,7 @@ from typing import List, Literal
 from dataclasses import dataclass, field
 from vlm4ocr.utils import get_default_page_delimiter
 
-OutputMode = Literal["markdown", "HTML", "text"]
+OutputMode = Literal["markdown", "HTML", "text", "JSON"]
 
 @dataclass
 class OCRResult:
@@ -33,8 +33,8 @@ class OCRResult:
         self.filename = os.path.basename(self.input_dir)
 
         # output_mode validation
-        if self.output_mode not in ["markdown", "HTML", "text"]:
-            raise ValueError("output_mode must be 'markdown', 'HTML', or 'text'")
+        if self.output_mode not in ["markdown", "HTML", "text", "JSON"]:
+            raise ValueError("output_mode must be 'markdown', 'HTML', 'text', or 'JSON'")
 
         # pages validation 
         if not isinstance(self.pages, list):

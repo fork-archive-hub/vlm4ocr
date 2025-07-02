@@ -1,6 +1,6 @@
 OCR engine handles the OCR process. It supports [batch processing](#batch-ocr) which is ideal for large amount of input files; [sequential processing](#sequential-ocr) which is good for lightweight tasks or testing; [streaming](#stream-ocr) that streams OCR results which is designed for frontend integration. 
 
-OCR engine requires an [VLM engine](./vlm_engines.md) instance and an `output_mode` as one of *markdown*, *HTML*, or *text*. The optional `user_prompt` can be used to provide additional information about the input files. For example, *The input is a scanned MRI report*. 
+OCR engine requires an [VLM engine](./vlm_engines.md) instance and an `output_mode` as one of *markdown*, *HTML*, *text*, or *JSON*. The optional `user_prompt` can be used to provide additional information about the input files. For example, *The input is a scanned MRI report*. Note that for `output_mode="JSON"`, the `user_prompt` is required to define the structure of the JSON output.
 
 ```python
 from vlm4ocr import OCREngine
