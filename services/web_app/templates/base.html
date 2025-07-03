@@ -11,8 +11,6 @@
 
     <header>
         <h1>VLM4OCR Lab</h1>
-        </ul>
-        </nav>
     </header>
 
     <main>
@@ -25,6 +23,10 @@
     </footer>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/ui_handlers.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/api_service.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/dom_updater.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
 </body>
 </html>

@@ -1,11 +1,12 @@
 import os
 import json
 from PIL import Image
+from markdown import markdown
 import io
 import base64
 import traceback
 from werkzeug.utils import secure_filename
-from flask import Response, stream_with_context
+from flask import Response, stream_with_context, jsonify
 from . import app, cleanup_file
 
 
@@ -171,6 +172,80 @@ def process_ocr_request(request):
              print(f"Calling cleanup_file due to unexpected setup error for {temp_file_path}")
              cleanup_file(temp_file_path, "setup general error cleanup")
         raise Exception(f"Failed during OCR setup: {setup_err}")
+
+
+def render_markdown_text(request):
+    """
+    Renders a given text string as HTML.
+    """
+    data = request.get_json()
+    if 'text' not in data:
+        raise ValueError("No text provided for rendering.")
+
+    text_to_render = data['text']
+    
+    # Sanitize and render the markdown
+    html = markdown(text_to_render, extensions=['fenced_code', 'tables'])
+    
+    return jsonify({'status': 'success', 'html': html})
+
+def process_batch_ocr_request(request):
+    """
+    Handles the core logic for a batch OCR request.
+    - Validates input files.
+    - Saves files temporarily.
+    - (Future step) Initializes engines.
+    - (Future step) Processes files concurrently.
+    - (Future step) Zips the results and returns them.
+    - Ensures cleanup.
+    """
+    print("Entering app_services.process_batch_ocr_request")
+    temp_file_paths = []
+    try:
+        # 1. File Validation
+        if 'batch_input_files' not in request.files:
+            raise ValueError("No input file part in request")
+
+        files = request.files.getlist('batch_input_files')
+        if not files or all(f.filename == '' for f in files):
+            raise ValueError("No selected files for batch processing")
+
+        # 2. Save Files Securely
+        for file in files:
+            if file and file.filename:
+                filename = secure_filename(file.filename)
+                temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(temp_file_path)
+                temp_file_paths.append(temp_file_path)
+                print(f"Saved temporary file: {temp_file_path}")
+
+        # --- Placeholder for further processing ---
+        # In the next steps, we will add the logic here to:
+        # - Initialize the VLM and OCR engines
+        # - Process each file using ocr_engine.concurrent_ocr
+        # - Collect the results
+        # - Zip the output files
+        # - Return the zip file for download
+
+        # For now, just return a success message
+        return jsonify({
+            'status': 'success',
+            'message': f'Successfully uploaded {len(temp_file_paths)} files.',
+            'filenames': [os.path.basename(p) for p in temp_file_paths]
+        })
+
+    except (ValueError, FileNotFoundError) as setup_val_err:
+        print(f"--- Setup Validation Error in batch process: {setup_val_err} ---")
+        traceback.print_exc()
+        raise setup_val_err
+    except Exception as setup_err:
+        print(f"--- Unexpected Setup Error in batch process: {setup_err} ---")
+        traceback.print_exc()
+        raise Exception(f"Failed during batch OCR setup: {setup_err}")
+    finally:
+        # Cleanup all saved temporary files
+        for path in temp_file_paths:
+            cleanup_file(path, "batch cleanup")
 
 
 def process_tiff_preview_request(request):
