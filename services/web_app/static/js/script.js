@@ -1,91 +1,81 @@
 document.addEventListener('DOMContentLoaded', function () {
-
-    // =================================================================
-    // == Initialization - SINGLE ENTRY POINT
-    // =================================================================
+    // State and Initialization
     initializeTabSwitching();
     initializeVlmOptionHandlers();
     initializeFilePreviewHandlers();
+    let pageContentsArray = [];
+    let currentOutputFormat = 'markdown';
 
-
-    // =================================================================
-    // == Main Logic Orchestration
-    // =================================================================
+    // Element Selectors
     const ocrForm = document.getElementById('ocr-form');
     const runOcrButton = document.getElementById('run-ocr-button');
     const ocrOutputArea = document.getElementById('ocr-output-area');
+    const outputFormatSelect = document.getElementById('output-format-select');
     const ocrRenderToggle = document.getElementById('ocr-render-toggle-checkbox');
     const copyOcrTextButton = document.getElementById('copy-ocr-text');
-    let rawOcrResult = ''; // This variable stays here to hold the state
+    const ocrToggleContainer = document.getElementById('ocr-toggle-container');
+    const outputHeader = document.getElementById('output-header');
 
-    // --- Handle SINGLE File Form Submission ---
+    // --- Event Listener for Output Format Change ---
+    if (outputFormatSelect) {
+        outputFormatSelect.addEventListener('change', function() {
+            currentOutputFormat = this.value;
+            updatePreviewIcon(currentOutputFormat);
+            if (pageContentsArray.length > 0) {
+                // Pass the element itself
+                renderFinalOutput(pageContentsArray, currentOutputFormat, ocrOutputArea, ocrRenderToggle);
+            }
+        });
+        currentOutputFormat = outputFormatSelect.value;
+        updatePreviewIcon(currentOutputFormat);
+    }
+
+    // --- Event Listener for Form Submission ---
     if (ocrForm) {
         ocrForm.addEventListener('submit', async function (event) {
             event.preventDefault();
+            pageContentsArray = [];
             const originalButtonText = runOcrButton.innerHTML;
-            rawOcrResult = ''; // Clear previous result
-
             setButtonState(runOcrButton, true, originalButtonText);
             displayProcessingMessage(ocrOutputArea);
-
             const formData = new FormData(ocrForm);
-            const outputFormat = formData.get('output_format'); // Get format at the start
-
+            currentOutputFormat = formData.get('output_format');
+            updatePreviewIcon(currentOutputFormat);
+            let streamStarted = false;
             try {
                 const response = await submitSingleOcr(formData);
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
-
+                    if (done) {
+                        // --- THIS IS THE CRUCIAL FIX ---
+                        // Pass the toggle ELEMENT directly to the rendering function.
+                        renderFinalOutput(pageContentsArray, currentOutputFormat, ocrOutputArea, ocrRenderToggle);
+                        ocrToggleContainer.style.display = 'flex';
+                        outputHeader.style.display = 'flex';
+                        break;
+                    }
                     buffer += decoder.decode(value, { stream: true });
                     let boundary = buffer.lastIndexOf('\n');
                     if (boundary === -1) continue;
-
+                    if (!streamStarted) {
+                        ocrOutputArea.innerHTML = '';
+                        streamStarted = true;
+                    }
                     let completeLines = buffer.substring(0, boundary);
                     buffer = buffer.substring(boundary + 1);
-
                     completeLines.split('\n').forEach(line => {
                         if (line.trim() === '') return;
                         try {
                             const jsonData = JSON.parse(line);
-                            if (jsonData.type === 'ocr_chunk' && jsonData.data) {
-                                rawOcrResult += jsonData.data; // Build up the full raw result
-                                // **CHANGE**: Call the updated append function with the full text and format
-                                appendOcrChunk(rawOcrResult, outputFormat, ocrOutputArea);
-                            }
+                            handleStreamItem(jsonData, currentOutputFormat, ocrOutputArea, pageContentsArray);
                         } catch (e) {
                             console.warn("Skipping invalid JSON line:", line, e);
                         }
                     });
                 }
-
-                // Handle any final data left in the buffer
-                if (buffer.trim()) {
-                    try {
-                        const jsonData = JSON.parse(buffer);
-                        if (jsonData.type === 'ocr_chunk' && jsonData.data) {
-                            rawOcrResult += jsonData.data;
-                            appendOcrChunk(rawOcrResult, outputFormat, ocrOutputArea);
-                        }
-                    } catch(e) {
-                        console.warn("Skipping invalid JSON in final buffer:", buffer, e);
-                    }
-                }
-
-                const outputFormat = formData.get('output_format');
-                if (outputFormat === 'markdown' || outputFormat === 'HTML') {
-                    ocrRenderToggle.checked = true;
-                    // SIMPLIFIED: Just call the handler with the raw result.
-                    await handleRenderOcrOutput(rawOcrResult);
-                } else {
-                    ocrRenderToggle.checked = false;
-                    displayRawText(rawOcrResult, ocrOutputArea);
-                }
-
             } catch (error) {
                 displayOcrError(error, ocrOutputArea);
             } finally {
@@ -94,42 +84,58 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- Handle OCR Output Rendering (Markdown/HTML) ---
-    async function handleRenderOcrOutput(text) {
-        try {
-            // MOVED: The cleaning logic is now here, so it runs every time.
-            const cleanedText = text.replace(/^```markdown\s*?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-            const data = await renderMarkdown(cleanedText); // Calls the API service
-            updateRenderedMarkdown(data.html, ocrOutputArea); // Updates the DOM
-        } catch (error) {
-            console.error('Error rendering markdown:', error);
-            ocrOutputArea.innerHTML += `<p class="error-message">Could not render preview.</p>`;
-        }
-    }
-
+    // --- Event Listener for Preview Toggle ---
     if (ocrRenderToggle) {
         ocrRenderToggle.addEventListener('change', function() {
-            if (this.checked) {
-                handleRenderOcrOutput(rawOcrResult);
-            } else {
-                displayRawText(rawOcrResult, ocrOutputArea);
+            if (pageContentsArray.length > 0) {
+                // Pass the element (this) itself
+                renderFinalOutput(pageContentsArray, currentOutputFormat, ocrOutputArea, this);
             }
         });
     }
 
-    // --- Handle Copy Text functionality ---
+    // --- Event Listener for Copy Button ---
     if (copyOcrTextButton) {
         copyOcrTextButton.addEventListener('click', function() {
-            navigator.clipboard.writeText(rawOcrResult).then(() => {
-                const originalTitle = this.title;
-                this.classList.add('fa-check'); this.classList.remove('fa-copy');
-                this.title = 'Copied!';
-                setTimeout(() => {
-                    this.classList.remove('fa-check'); this.classList.add('fa-copy');
-                    this.title = originalTitle;
-                }, 2000);
-            });
+            const textToCopy = pageContentsArray.join('\n\n---\n\n');
+            copyTextToClipboard(textToCopy, this);
         });
     }
-
 });
+
+// Utility Functions
+function showCopyConfirmation(button) {
+    const originalTitle = button.title;
+    button.classList.add('fa-check');
+    button.classList.remove('fa-copy');
+    button.title = 'Copied!';
+    setTimeout(() => {
+        button.classList.remove('fa-check');
+        button.classList.add('fa-copy');
+        button.title = originalTitle;
+    }, 2000);
+}
+
+function copyTextToClipboard(textToCopy, button) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            showCopyConfirmation(button);
+        }).catch(err => console.error('Failed to copy with Clipboard API:', err));
+    } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = textToCopy;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            if (document.execCommand('copy')) {
+                showCopyConfirmation(button);
+            }
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+        }
+        document.body.removeChild(textArea);
+    }
+}

@@ -253,6 +253,7 @@ button[type="submit"]:hover {
 #ocr-output-wrapper { 
     display: flex;
     flex-direction: column;
+    height: 74vh;
     border: 1px solid #ced4da; 
     border-radius: 3px;
     background-color: #ffffff; 
@@ -268,6 +269,7 @@ button[type="submit"]:hover {
     flex-grow: 1;
     overflow-y: auto; 
     min-height: 0; 
+    height: 74vh;
     background-color: #f8f9fa; 
 }
 

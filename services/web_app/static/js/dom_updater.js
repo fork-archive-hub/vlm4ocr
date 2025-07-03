@@ -2,96 +2,165 @@
 // == DOM Manipulation Functions
 // =================================================================
 
-/**
- * Sets the state of a button, showing a spinner and disabling it while loading.
- * @param {HTMLElement} button - The button element to update.
- * @param {boolean} isLoading - Whether the button should be in a loading state.
- * @param {string} originalText - The original text to restore when not loading.
- */
+let pageContentHosts = {};
+let currentPageCounter = 0;
+
 function setButtonState(button, isLoading, originalText) {
     button.disabled = isLoading;
-    if (isLoading) {
-        button.innerHTML = '<span class="spinner"></span> Processing...';
-    } else {
-        button.innerHTML = originalText;
-    }
+    button.innerHTML = isLoading ? '<span class="spinner"></span> Processing...' : originalText;
 }
 
-/**
- * Displays the initial "processing" message in a target area.
- * @param {HTMLElement} outputArea - The element to update.
- */
 function displayProcessingMessage(outputArea) {
-    outputArea.innerHTML = '<p class="ocr-status-message">Processing... Please wait.</p>';
-    // Also hide result-specific elements
+    outputArea.innerHTML = '<p class="ocr-status-message ocr-status-processing">Processing... Please wait.</p>';
     document.getElementById('output-header').style.display = 'none';
     document.getElementById('ocr-toggle-container').style.display = 'none';
+    pageContentHosts = {};
+    currentPageCounter = 0;
 }
 
-/**
- * Displays the successful OCR result in the output area.
- * @param {object} data - The success data from the API.
- * @param {HTMLElement} ocrOutputArea - The element to display the result in.
- * @returns {string} The raw text result.
- */
-function displaySingleOcrSuccess(data, ocrOutputArea) {
-    ocrOutputArea.innerHTML = `<pre><code>${data.text}</code></pre>`;
-    document.getElementById('output-header').style.display = 'flex';
-    document.getElementById('ocr-toggle-container').style.display = 'flex';
-    return data.text; // Return the raw text to be stored
-}
-
-/**
- * Displays an error message in the output area.
- * @param {Error} error - The error object.
- * @param {HTMLElement} outputArea - The element to display the error in.
- */
 function displayOcrError(error, outputArea) {
     console.error('An error occurred:', error);
-    outputArea.innerHTML = `<p class="ocr-status-message error-message">Error: ${error.message}</p>`;
+    outputArea.innerHTML = `<p class="ocr-status-message ocr-status-error">Error: ${error.message}</p>`;
+}
+
+function updatePreviewIcon(format) {
+    const previewIcon = document.getElementById('preview-icon');
+    if (!previewIcon) return;
+    let iconClass = 'fa-markdown', title = 'Markdown Preview', lib = 'fab';
+    if (format.toLowerCase() === 'html') {
+        iconClass = 'fa-code'; title = 'HTML Preview'; lib = 'fas';
+    } else if (format.toLowerCase() === 'text') {
+        iconClass = 'fa-file-alt'; title = 'Text Preview'; lib = 'fas';
+    }
+    previewIcon.className = `${lib} ${iconClass}`;
+    previewIcon.title = title;
+}
+
+function getOrCreatePageHost(outputArea, outputFormat) {
+    if (pageContentHosts[currentPageCounter]) {
+        return pageContentHosts[currentPageCounter];
+    }
+    const pageWrapper = document.createElement('div');
+    pageWrapper.id = `page-wrapper-${currentPageCounter}`;
+    outputArea.appendChild(pageWrapper);
+    let newHost;
+    const format = outputFormat.toLowerCase();
+
+    if (format === 'html') {
+        const shadowHost = document.createElement('div');
+        shadowHost.className = 'ocr-html-shadow-host';
+        try {
+            const shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+            const style = document.createElement('style');
+            style.textContent = `:host { display: block; border: 1px dashed #ccc; padding: 10px; margin-bottom: 10px; } body { margin: 0; }`;
+            shadowRoot.appendChild(style);
+            newHost = shadowRoot;
+        } catch (e) { newHost = document.createElement('pre'); }
+        pageWrapper.appendChild(shadowHost);
+    } else if (format === 'markdown') {
+        newHost = document.createElement('div');
+        newHost.className = 'ocr-markdown-content';
+        pageWrapper.appendChild(newHost);
+    } else {
+        newHost = document.createElement('pre');
+        newHost.className = 'ocr-plaintext-content';
+        pageWrapper.appendChild(newHost);
+    }
+    pageContentHosts[currentPageCounter] = newHost;
+    return newHost;
+}
+
+function handleStreamItem(item, outputFormat, outputArea, pageContentsArray) {
+    if (item.type === 'ocr_chunk' && typeof item.data === 'string') {
+        pageContentsArray[currentPageCounter] = (pageContentsArray[currentPageCounter] || '') + item.data;
+        const host = getOrCreatePageHost(outputArea, outputFormat);
+        const format = outputFormat.toLowerCase();
+
+        if (host.nodeType === Node.DOCUMENT_FRAGMENT_NODE) { // ShadowRoot for HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = pageContentsArray[currentPageCounter];
+            const style = host.querySelector('style');
+            host.innerHTML = '';
+            if (style) host.appendChild(style);
+            while (tempDiv.firstChild) {
+                host.appendChild(tempDiv.firstChild);
+            }
+        } else {
+             if (format === 'markdown' && typeof marked !== 'undefined') {
+                host.innerHTML = marked.parse(pageContentsArray[currentPageCounter].replace(/```markdown|```/g, ''));
+             } else {
+                host.textContent = pageContentsArray[currentPageCounter];
+             }
+        }
+    } else if (item.type === 'page_delimiter') {
+        const wrapper = document.getElementById(`page-wrapper-${currentPageCounter}`);
+        if (wrapper) {
+            const hr = document.createElement('hr');
+            hr.className = 'page-delimiter-hr';
+            wrapper.insertAdjacentElement('afterend', hr);
+        }
+        currentPageCounter++;
+    } else if (item.type === 'error') {
+        displayOcrError(new Error(item.data), outputArea);
+    }
 }
 
 /**
- * Updates the output area with HTML rendered from Markdown.
- * @param {string} html - The HTML string to render.
- * @param {HTMLElement} outputArea - The element to update.
+ * Renders the final output. The Markdown logic now mirrors the streaming logic.
  */
-function updateRenderedMarkdown(html, outputArea) {
-    outputArea.innerHTML = `<div class="rendered-markdown">${html}</div>`;
-}
+function renderFinalOutput(pageContentsArray, outputFormat, outputArea, toggleElement) {
+    outputArea.innerHTML = '';
+    const isPreviewMode = toggleElement ? toggleElement.checked : true;
+    const rawText = pageContentsArray.join('\n\n---\n\n');
 
-/**
- * Displays raw text inside a <pre><code> block.
- * @param {string} rawText - The raw text to display.
- * @param {HTMLElement} outputArea - The element to update.
- */
-function displayRawText(rawText, outputArea) {
-    outputArea.innerHTML = `<pre><code>${rawText}</code></pre>`;
-}
-
-
-/**
- * Appends a chunk of text to the OCR output area, rendering it if the format is markdown.
- * @param {string} rawOcrResult - The ENTIRE raw text accumulated so far.
- * @param {string} outputFormat - The current output format (e.g., 'markdown').
- * @param {HTMLElement} outputArea - The element to update.
- */
-function appendOcrChunk(rawOcrResult, outputFormat, outputArea) {
-    // On the first chunk, clear the "Processing..." message
-    if (outputArea.querySelector('.ocr-status-message')) {
-        outputArea.innerHTML = '';
-        // Show the result headers
-        document.getElementById('output-header').style.display = 'flex';
-        document.getElementById('ocr-toggle-container').style.display = 'flex';
+    if (!isPreviewMode) {
+        const pre = document.createElement('pre');
+        pre.className = 'ocr-rawtext-content';
+        pre.textContent = rawText;
+        outputArea.appendChild(pre);
+        return;
     }
 
-    // If the format is markdown, render it. Otherwise, display as plain text.
-    if (outputFormat === 'markdown' && typeof marked !== 'undefined') {
-        // Clean the markdown output by removing the code fences for live rendering
-        const cleanedForLiveRender = rawOcrResult.replace(/```markdown/g, '').replace(/```/g, '');
-        outputArea.innerHTML = marked.parse(cleanedForLiveRender);
-    } else {
-        // For 'text', 'HTML', or if marked.js is missing, show raw text
-        outputArea.textContent = rawOcrResult;
+    const format = outputFormat.toLowerCase();
+
+    if (format === 'html') {
+        if (pageContentsArray.length > 0) {
+            const combinedHtml = pageContentsArray.join(`<hr class='page-delimiter-hr page-delimiter-html-view'>`);
+            let wrapper = document.createElement('div');
+            wrapper.className = 'ocr-page-content-rendered-wrapper html-wrapper single-html-container';
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'width: 100%; border: none; height: 75vh;';
+            const baseStyle = `<style>html,body{margin:0;padding:0;height:100%;overflow:auto;}body{font-family:sans-serif;color:#212529;background-color:#fff;padding:10px;}hr.page-delimiter-html-view{border:0;height:1px;background-color:#ced4da;margin:25px 5px;}</style>`;
+            iframe.srcdoc = baseStyle + combinedHtml;
+            iframe.onerror = () => {
+                wrapper.innerHTML = `<p class='ocr-status-error'>Error loading HTML content into preview.</p><pre>${combinedHtml}</pre>`;
+            };
+            wrapper.appendChild(iframe);
+            outputArea.appendChild(wrapper);
+        } else {
+            outputArea.innerHTML = '<p class="ocr-status-message">No HTML content to display.</p>';
+        }
+    } else if (format === 'markdown' && typeof marked !== 'undefined') {
+        // --- THIS IS THE KEY FIX ---
+        // Iterate and render each page separately, just like the stream handler.
+        pageContentsArray.forEach((pageContent, index) => {
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'ocr-markdown-content';
+            const cleanedContent = pageContent.replace(/```markdown|```/g, '');
+            pageDiv.innerHTML = marked.parse(cleanedContent);
+            outputArea.appendChild(pageDiv);
+
+            // Add a delimiter between pages, but not after the last one
+            if (index < pageContentsArray.length - 1) {
+                const hr = document.createElement('hr');
+                hr.className = 'page-delimiter-hr';
+                outputArea.appendChild(hr);
+            }
+        });
+    } else { // text
+        const pre = document.createElement('pre');
+        pre.className = 'ocr-plaintext-content';
+        pre.textContent = rawText;
+        outputArea.appendChild(pre);
     }
 }
