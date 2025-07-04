@@ -255,7 +255,6 @@ def download_processed_file(batch_id, filename):
     try:
         relative_path = TEMP_DIR / str(batch_id) / filename
         absolute_path = Path("/app") / relative_path
-        current_app.logger.info(f"Attempting to send file from absolute path: {absolute_path}")
         return send_file(absolute_path, as_attachment=True)
 
     except FileNotFoundError as e:
@@ -284,16 +283,6 @@ def download_batch_as_zip(batch_id):
                 zf.write(f, arcname=f.name)
                 
     memory_file.seek(0)
-
-    @after_this_request
-    def cleanup(response):
-        """This function is called after the response has been sent."""
-        try:
-            print(f"Cleaning up temporary directory: {directory}")
-            shutil.rmtree(directory)
-        except Exception as e:
-            print(f"Error during cleanup of {directory}: {e}")
-        return response
 
     if not memory_file.getbuffer().nbytes:
         return "No processed files found to download.", 404
