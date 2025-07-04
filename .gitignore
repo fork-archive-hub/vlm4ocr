@@ -2,6 +2,9 @@
 # compiled files
 *.pyc
 
+# temporary files
+services/web_app/temp
+
 # packages
 packages/vlm4ocr/develop
 packages/vlm4ocr/dist
