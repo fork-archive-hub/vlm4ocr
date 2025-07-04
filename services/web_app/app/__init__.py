@@ -3,6 +3,7 @@ import yaml
 from easydict import EasyDict
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
+import logging
 
 """ Define configuration Paths """
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,6 +44,8 @@ app = Flask(__name__,
             instance_relative_config=False, 
             template_folder='../templates',
             static_folder='../static')
+
+app.logger.setLevel(logging.INFO)
 
 server_name = os.environ.get('SERVER_NAME', None)
 if server_name:

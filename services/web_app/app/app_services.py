@@ -156,12 +156,12 @@ def initiate_batch_job(request):
     return batch_id
 
 
-def process_batch_ocr_stream(batch_id):
+# In services/web_app/app/app_services.py
+
+def process_batch_ocr_stream(batch_id, base_url):
     """
     Finds a batch job by its ID, processes it, and streams results.
-    This function uses a thread-safe queue to bridge the async OCR engine
-    with the sync Flask context, ensuring robust error handling and
-    graceful connection management.
+    This function now correctly handles URL generation in the main thread.
     """
     q = queue.Queue()
     # Get a safe reference to the current Flask app object
@@ -170,12 +170,11 @@ def process_batch_ocr_stream(batch_id):
     def run_async_ocr_worker():
         """
         This worker function runs in a separate background thread.
-        It handles the heavy OCR processing and puts results into the queue.
+        It is now only responsible for OCR processing.
         """
-        # Establish an application context for this background thread.
-        # This is crucial for allowing functions like url_for() to work.
+        # Establish an application context for this background thread
         with app.app_context():
-            # Create a new asyncio event loop for this thread.
+            # Create a new asyncio event loop for this thread
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -183,21 +182,16 @@ def process_batch_ocr_stream(batch_id):
                 form_data_path = batch_dir / 'form_data.json'
 
                 if not batch_dir.exists() or not form_data_path.exists():
-                    q.put(json.dumps({'type': 'error', 'data': f'Batch job {batch_id} not found or is invalid.'}))
+                    q.put(json.dumps({'type': 'error', 'data': f'Batch job {batch_id} not found.'}))
                     return
 
                 with open(form_data_path, 'r') as f:
                     form_data = json.load(f)
 
-                # Initialize the OCR engine using the helper function
                 ocr_engine = _initialize_ocr_engine(form_data)
-
-                # Safely get the output format extension
                 output_format_ext_map = {"text": "txt", "markdown": "md", "HTML": "html"}
                 output_format = form_data.get('output_format', 'markdown')
                 output_format_ext = output_format_ext_map.get(output_format, 'md')
-
-                # Get the paths of the image files to be processed
                 image_paths = [str(p) for p in batch_dir.iterdir() if p.is_file() and p.suffix.lower() not in ['.json']]
 
                 async def process_and_queue_results():
@@ -212,45 +206,66 @@ def process_batch_ocr_stream(batch_id):
                             with open(batch_dir / output_filename, "w", encoding="utf-8") as f:
                                 f.write(output_content)
                             
-                            # Build the full external URL, now safely within the app context
-                            download_url = url_for('download_file', batch_id=batch_id, filename=output_filename, _external=True)
-                            q.put(json.dumps({'type': 'result', 'filename': output_filename, 'download_url': download_url}))
+                            # The worker only sends back the filename for successful results
+                            q.put(json.dumps({'type': 'result', 'filename': output_filename}))
                         else:
-                            error_data = getattr(result, 'error_message', 'An unknown processing error occurred.')
+                            error_data = getattr(result, 'error_message', 'Unknown error.')
                             q.put(json.dumps({'type': 'error', 'filename': Path(result.filename).name, 'data': error_data}))
 
-                # Run the async OCR process to completion
                 loop.run_until_complete(process_and_queue_results())
 
             except Exception as e:
-                # If any error occurs, send the full traceback to the client
                 print("--- CRITICAL ERROR IN BATCH WORKER THREAD ---")
                 traceback.print_exc()
                 error_trace = traceback.format_exc()
                 q.put(json.dumps({'type': 'error', 'data': f'A critical server error occurred:\n{error_trace}'}))
             finally:
-                # IMPORTANT: Always put a sentinel value at the end to signal completion.
-                q.put(None)
+                q.put(None) # Sentinel value to signal completion
 
-    # Start the background thread
+    # The base_url is NOT passed to the worker thread
     thread = threading.Thread(target=run_async_ocr_worker)
     thread.start()
 
-    # In the main Flask thread, yield messages from the queue as they arrive
+    # This loop runs in the main thread with the request context
     while True:
-        message = q.get() # This blocks until a message is available
-        if message is None:
-            # The sentinel value has been received; the worker is done.
-            # Send the final 'completed' message from the main thread.
+        message_json = q.get()
+        if message_json is None:
             yield json.dumps({'type': 'completed', 'batch_id': batch_id})
-            break # Exit the loop and allow Flask to close the connection gracefully
+            break
+
+        message = json.loads(message_json)
         
-        yield message
+        # If the message is a successful result, build the URL here
+        if message['type'] == 'result':
+            relative_url = url_for('download_file', batch_id=batch_id, filename=message['filename'])
+            # Combine the base_url from the initial request with the new relative_url
+            download_url = f"{base_url.rstrip('/')}{relative_url}"
+            message['download_url'] = download_url
+            yield json.dumps(message)
+        else:
+            # For errors or other message types, just pass them along
+            yield message_json
+
 
 def download_processed_file(batch_id, filename):
-    """Serves a single file from a specific batch directory."""
-    directory = TEMP_DIR / str(batch_id)
-    return send_from_directory(directory, filename, as_attachment=True)
+    """
+    Finds a specific processed file within a batch directory and sends it,
+    now using a robust method to construct the absolute path.
+    """
+    try:
+        relative_path = TEMP_DIR / str(batch_id) / filename
+        absolute_path = Path("/app") / relative_path
+        current_app.logger.info(f"Attempting to send file from absolute path: {absolute_path}")
+        return send_file(absolute_path, as_attachment=True)
+
+    except FileNotFoundError as e:
+        current_app.logger.error(f"Caught FileNotFoundError in service: {e}")
+        # Re-raise to be caught by the route
+        raise e
+    except Exception as e:
+        current_app.logger.error(f"An unexpected exception occurred in download_processed_file: {e}")
+        traceback.print_exc()
+        raise e
 
 
 def download_batch_as_zip(batch_id):
@@ -265,7 +280,6 @@ def download_batch_as_zip(batch_id):
 
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
         for f in directory.iterdir():
-            # Your logic to include form_data.json is preserved
             if f.is_file() and (f.name.lower().endswith(output_extensions) or f.name.lower() == "form_data.json"):
                 zf.write(f, arcname=f.name)
                 

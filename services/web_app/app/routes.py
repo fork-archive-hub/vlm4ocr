@@ -1,6 +1,10 @@
+import os
 import traceback
 import json
-from flask import render_template, request, jsonify, Response, stream_with_context
+from pathlib import Path
+from werkzeug.exceptions import NotFound
+from flask import render_template, request, jsonify, Response, stream_with_context, send_from_directory, send_file
+from flask import abort, current_app, send_from_directory
 from . import app
 from . import app_services
 
@@ -81,7 +85,8 @@ def handle_stream_batch_results(batch_id):
     """
     def generate_events():
         try:
-            for message in app_services.process_batch_ocr_stream(batch_id):
+            url_root = request.url_root 
+            for message in app_services.process_batch_ocr_stream(batch_id, url_root):
                 yield f"data: {message}\n\n"
         except Exception as e:
             error_message = json.dumps({'type': 'error', 'data': f'An internal server error occurred: {str(e)}'})
@@ -91,10 +96,21 @@ def handle_stream_batch_results(batch_id):
     return Response(stream_with_context(generate_events()), mimetype='text/event-stream')
 
 
-@app.route('/api/download_file/<batch_id>/<filename>')
+@app.route('/api/download_file/<batch_id>/<filename>', methods=['GET'])
 def download_file(batch_id, filename):
-    """ Serves a single processed file from a temporary batch directory. """
-    return app_services.download_processed_file(batch_id, filename)
+    """
+    Handles the file download request by calling the appropriate service function.
+    """
+    try:
+        return app_services.download_processed_file(batch_id, filename)
+    except FileNotFoundError as e:
+        # CHANGE THIS LINE: Log the full error message from the service
+        current_app.logger.error(f"Route caught specific FileNotFoundError: {e}")
+        abort(404)
+    except Exception as e:
+        current_app.logger.error(f"An unexpected error occurred during download: {e}")
+        traceback.print_exc()
+        return "Internal Server Error", 500
 
 @app.route('/api/download_batch_zip/<batch_id>')
 def download_batch_zip(batch_id):
