@@ -104,7 +104,6 @@ def download_file(batch_id, filename):
     try:
         return app_services.download_processed_file(batch_id, filename)
     except FileNotFoundError as e:
-        # CHANGE THIS LINE: Log the full error message from the service
         current_app.logger.error(f"Route caught specific FileNotFoundError: {e}")
         abort(404)
     except Exception as e:
