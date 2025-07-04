@@ -8,3 +8,5 @@
       name: 'Azure OpenAI'
     - value: 'ollama'
       name: 'Ollama'
+
+  temp_directory: "services/web_app/temp"

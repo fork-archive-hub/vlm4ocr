@@ -42,21 +42,11 @@ app = Flask(__name__,
             instance_relative_config=False, 
             template_folder='../templates',
             static_folder='../static')
-
-""" App Configuration """
-print(f"Setting UPLOAD_FOLDER to: {UPLOAD_FOLDER}")
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['SERVER_NAME'] = '10.0.0.65:5000'
 
 """ Load App-Specific Config from YAML """
 print(f"Loading app config from: {CONFIG_PATH}")
 app.app_config = load_app_config(CONFIG_PATH)
-
-""" Ensure Upload Folder Exists """
-try:
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    print(f"Upload folder ensured: {UPLOAD_FOLDER}")
-except OSError as e:
-    print(f"Error creating upload folder {UPLOAD_FOLDER}: {e}")
 
 """ Import Routes (must be done after app is created) """
 print("Importing routes...")
