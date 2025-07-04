@@ -92,6 +92,14 @@ function handleStreamItem(item, outputFormat, outputArea, pageContentsArray) {
                 host.textContent = pageContentsArray[currentPageCounter];
              }
         }
+        
+        const scrollThreshold = 50; // Pixels from bottom to still auto-scroll
+        const userScrolledUp = outputArea.scrollHeight - outputArea.scrollTop - outputArea.clientHeight > scrollThreshold;
+
+        if (!userScrolledUp && outputArea.scrollHeight > outputArea.clientHeight) {
+            outputArea.scrollTop = outputArea.scrollHeight;
+        }
+
     } else if (item.type === 'page_delimiter') {
         const wrapper = document.getElementById(`page-wrapper-${currentPageCounter}`);
         if (wrapper) {
