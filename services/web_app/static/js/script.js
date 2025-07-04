@@ -101,6 +101,230 @@ document.addEventListener('DOMContentLoaded', function () {
             copyTextToClipboard(textToCopy, this);
         });
     }
+
+        // =================================================================
+    // == Batch Processing Tab Elements
+    // =================================================================
+    const batchForm = document.getElementById('batch-ocr-form');
+    const batchFileInput = document.getElementById('batch-input-file');
+    const batchVlmApiSelect = document.getElementById('batch-vlm-api-select');
+    const batchInputFileListArea = document.getElementById('batch-input-file-list-area');
+    const batchOutputFileListhArea = document.getElementById('batch-output-file-list-area');
+    const runBatchOcrButton = document.getElementById('run-batch-ocr-button');
+
+    // =================================================================
+    // == Event Listeners for Batch Tab
+    // =================================================================
+
+    // Listener for VLM API selection change in the batch tab
+    if (batchVlmApiSelect) {
+        batchVlmApiSelect.addEventListener('change', handleBatchVlmApiChange);
+    }
+
+    // Listener for file input changes in the batch tab
+    if (batchFileInput) {
+        batchFileInput.addEventListener('change', updateBatchFileList);
+    }
+
+    // Listener for the batch OCR form submission
+    if (batchForm) {
+        batchForm.addEventListener('submit', handleBatchFormSubmit);
+    }
+
+
+    // =================================================================
+    // == Handler Functions for Batch Tab
+    // =================================================================
+
+    /**
+     * Shows/hides conditional input fields based on the selected VLM API for the batch form.
+     */
+    function handleBatchVlmApiChange() {
+        // Hide all conditional option divs
+        document.querySelectorAll('#batch-ocr-form .conditional-options').forEach(div => {
+            div.style.display = 'none';
+        });
+
+        // Show the relevant div based on selection
+        const selectedApi = batchVlmApiSelect.value;
+        const optionsDiv = document.getElementById(`batch-${selectedApi}-options`);
+        if (optionsDiv) {
+            optionsDiv.style.display = 'block';
+        }
+    }
+
+    /**
+     * Updates the UI to display the list of selected files for the batch process.
+     * This version uses styled list-group containers for a cleaner look.
+     */
+    function updateBatchFileList() {
+        if (!batchInputFileListArea || !batchFileInput.files) return;
+
+        batchInputFileListArea.innerHTML = ''; // Clear previous list
+
+        if (batchFileInput.files.length === 0) {
+            batchInputFileListArea.innerHTML = '<p class="ocr-status-message">Uploaded files will be listed here.</p>';
+            return;
+        }
+
+        const list = document.createElement('div');
+        list.className = 'list-group'; // Use a div with a list-group class
+
+        for (const file of batchFileInput.files) {
+            const listItem = document.createElement('div');
+            listItem.className = 'list-group-item'; // Each file is a list-group-item
+
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-file-alt me-2'; // Font Awesome file icon
+            
+            listItem.appendChild(icon);
+            listItem.appendChild(document.createTextNode(` ${file.name}`));
+            list.appendChild(listItem);
+        }
+        batchInputFileListArea.appendChild(list);
+    }
+
+    /**
+     * Handles the submission of the batch OCR form.
+     * This now uses a two-step process:
+     * 1. POSTs the form data to get a unique batch ID.
+     * 2. Uses that ID to open a GET EventSource connection for streaming results.
+     */
+    function handleBatchFormSubmit(event) {
+        event.preventDefault(); // Prevent the default form submission
+
+        const formData = new FormData(batchForm);
+        const totalFiles = batchFileInput.files.length;
+
+        if (totalFiles === 0) {
+            alert("Please select files to process.");
+            return;
+        }
+
+        // --- UI Updates for Processing ---
+        runBatchOcrButton.disabled = true;
+        runBatchOcrButton.textContent = 'Uploading...';
+        batchOutputFileListhArea.innerHTML = '<p class="ocr-status-message">Uploading files and initiating batch job...</p>';
+        document.getElementById('batch-download-all-button')?.remove(); // Remove old button if it exists
+
+        // --- Step 1: Initiate the batch job via POST ---
+        fetch('/api/initiate_batch_ocr', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error || 'Server error') });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success' && data.batch_id) {
+                // --- UI Update ---
+                runBatchOcrButton.textContent = 'Processing...';
+                batchOutputFileListhArea.innerHTML = '<p class="ocr-status-message">Processing... waiting for first file to complete.</p>';
+                
+                // --- Step 2: Start streaming results via GET ---
+                startStreamingResults(data.batch_id);
+            } else {
+                throw new Error(data.error || 'Failed to initiate batch job.');
+            }
+        })
+        .catch(err => {
+            console.error("Failed to initiate batch OCR:", err);
+            batchOutputFileListhArea.innerHTML = `<p class="ocr-status-message text-danger">Error: ${err.message}</p>`;
+            runBatchOcrButton.disabled = false;
+            runBatchOcrButton.textContent = 'Run Batch OCR';
+        });
+    }
+
+    /**
+     * Connects to the SSE endpoint to stream results for a given batch ID.
+     * @param {string} batchId - The unique ID for the batch job.
+     */
+    function startStreamingResults(batchId) {
+        const eventSource = new EventSource(`/api/stream_batch_results/${batchId}`);
+        let processedFiles = 0;
+
+        // --- SSE Message Handler ---
+        eventSource.onmessage = function(e) {
+            const message = JSON.parse(e.data);
+
+            // Create the list container on the first valid message
+            if (processedFiles === 0 && message.type !== 'completed') {
+                batchOutputFileListhArea.innerHTML = '';
+                const list = document.createElement('div');
+                list.className = 'list-group';
+                list.id = 'batch-output-list-group';
+                batchOutputFileListhArea.appendChild(list);
+            }
+
+            const outputListGroup = document.getElementById('batch-output-list-group');
+
+            if (message.type === 'result') {
+                processedFiles++;
+                const link = document.createElement('a');
+                link.href = message.download_url;
+                link.className = 'list-group-item list-group-item-action list-group-item-success';
+                link.setAttribute('download', '');
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-download me-2';
+                link.appendChild(icon);
+                link.appendChild(document.createTextNode(` ${message.filename}`));
+                outputListGroup.appendChild(link);
+
+            } else if (message.type === 'error') {
+                const errorItem = document.createElement('div');
+                errorItem.className = 'list-group-item list-group-item-danger';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-exclamation-triangle me-2';
+                errorItem.appendChild(icon);
+                errorItem.appendChild(document.createTextNode(` Error: ${message.filename || 'a file'} - ${message.data}`));
+                outputListGroup.appendChild(errorItem);
+            
+            } else if (message.type === 'completed') {
+                // --- THIS IS THE COMPLETED LOGIC ---
+                // 1. Gracefully close the connection from the client side
+                eventSource.close();
+                
+                // 2. Re-enable the run button
+                runBatchOcrButton.disabled = false;
+                runBatchOcrButton.textContent = 'Run Batch OCR';
+
+                // 3. Create and show the "Download All" button
+                const downloadAllButton = document.createElement('a');
+                downloadAllButton.id = 'batch-download-all-button';
+                downloadAllButton.href = `/api/download_batch_zip/${message.batch_id}`;
+                downloadAllButton.className = 'btn btn-success mt-3';
+                downloadAllButton.innerHTML = '<i class="fas fa-file-archive"></i> Download All as ZIP';
+                
+                // Append it after the list of files, ensuring no duplicates
+                const existingButton = document.getElementById('batch-download-all-button');
+                if (!existingButton) {
+                    batchOutputFileListhArea.insertAdjacentElement('afterend', downloadAllButton);
+                }
+            }
+        };
+
+        // --- SSE Error Handler ---
+        eventSource.onerror = function(err) {
+            console.error("EventSource failed:", err);
+            eventSource.close(); // Always close on error
+            runBatchOcrButton.disabled = false;
+            runBatchOcrButton.textContent = 'Run Batch OCR';
+            
+            // Avoid adding a duplicate error message if one already exists
+            if (!document.querySelector('#batch-output-list-group .list-group-item-danger')) {
+                const errorPara = document.createElement('p');
+                errorPara.className = 'ocr-status-message text-danger';
+                errorPara.textContent = 'A connection error occurred. Please check the server logs and try again.';
+                batchOutputFileListhArea.appendChild(errorPara);
+            }
+        };
+    }
+
+    // Initialize the VLM options on page load for the batch tab
+    handleBatchVlmApiChange();
 });
 
 // Utility Functions

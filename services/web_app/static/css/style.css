@@ -192,6 +192,10 @@ button[type="submit"]:hover {
     margin-top: 10px;
 }
 
+.conditional-options.is-visible {
+    display: block !important;
+}
+
 .indented-option {
     margin-left: 15px; /* Provides space for the parent <summary> marker if needed */
     padding-left: 15px;
@@ -652,4 +656,49 @@ input:checked + .slider:before { transform: translateX(26px); } /* Knob movement
 /* Only show the tab pane that has the .active and .show classes */
 .tab-content .tab-pane.active.show {
     display: block; /* Or 'grid' if you use display: grid for the layout inside */
+}
+
+/* Styling for the new file list containers */
+.list-group {
+    border-radius: 5px;
+    overflow: hidden; /* Ensures child border-radius conforms */
+    display: flex; /* Add this line */
+    flex-direction: column; /* Add this line */
+}
+
+.list-group-item {
+    background-color: #3a3a3a; /* Dark item background */
+    border: 1px solid #444; /* Slightly lighter border */
+    color: #e0e0e0;
+    padding: 10px 15px;
+    border-top: none; /* Remove top border for all but the first */
+}
+
+.list-group-item:first-child {
+    border-top: 1px solid #444; /* Add top border back for the first item */
+}
+
+/* Styling for the output file links */
+a.list-group-item-action {
+    color: #77c6ff; /* Light blue for links */
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+
+a.list-group-item-action:hover {
+    background-color: #4a4a4a; /* Darker hover effect */
+    color: #ffffff;
+}
+
+.list-group-item-success {
+    border-left: 3px solid #28a745; /* Green left border for success */
+}
+
+.list-group-item-danger {
+    color: #f8d7da;
+    border-left: 3px solid #dc3545; /* Red left border for error */
+}
+
+.me-2 {
+    margin-right: 0.5rem;
 }

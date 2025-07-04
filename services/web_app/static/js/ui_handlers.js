@@ -22,31 +22,25 @@ function initializeVlmOptionHandlers() {
 }
 
 /**
- * Shows the relevant conditional options div and hides the others based on the API selection.
+ * Shows the relevant conditional options div and hides the others by toggling a class.
  * @param {HTMLElement} formElement - The form element containing the dropdown.
- * @param {string} selectedApiValue - The value of the selected VLM API from the <option> tag.
+ * @param {string} selectedApiValue - The value of the selected VLM API.
  * @param {string} idPrefix - The prefix for the div IDs (e.g., 'batch-').
  */
 function updateConditionalOptions(formElement, selectedApiValue, idPrefix) {
-    // Hide all conditional option divs within the specified form
+    // Hide all conditional option divs by removing the 'is-visible' class
     formElement.querySelectorAll('.conditional-options').forEach(div => {
-        div.style.display = 'none';
+        div.classList.remove('is-visible');
     });
 
-    // **FIX**: Normalize the value to ensure it matches the div ID format (e.g., 'azure_openai' becomes 'azure-openai')
+    // Normalize the value to ensure it matches the div ID format
     const normalizedApi = selectedApiValue.replace(/_/g, '-');
-
-    // Construct the ID for the div to show
     const optionsDivId = `${idPrefix}${normalizedApi}-options`;
     const optionsDiv = document.getElementById(optionsDivId);
 
-    // For debugging: Log what we're looking for and if we found it.
-    console.log(`Looking for div with ID: #${optionsDivId}`);
     if (optionsDiv) {
-        console.log("Found it! Displaying div.");
-        optionsDiv.style.display = 'block';
-    } else {
-        console.log("Could not find the matching div.");
+        // Show the correct div by adding the 'is-visible' class
+        optionsDiv.classList.add('is-visible');
     }
 }
 

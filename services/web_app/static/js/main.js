@@ -3,8 +3,6 @@
  * This version manually manipulates classes and has no external dependencies.
  */
 function initializeTabSwitching() {
-    console.log("Attempting to initialize tabs (manual method)...");
-
     const singleFileTabLink = document.getElementById('single-file-tab-link');
     const batchProcessTabLink = document.getElementById('batch-process-tab-link');
     const singleFilePane = document.getElementById('single-file-pane');
@@ -29,15 +27,11 @@ function initializeTabSwitching() {
 
     singleFileTabLink.addEventListener('click', function (event) {
         event.preventDefault();
-        console.log("Switching to Single File Tab");
         switchTabs(singleFileTabLink, batchProcessTabLink, singleFilePane, batchProcessPane);
     });
 
     batchProcessTabLink.addEventListener('click', function (event) {
         event.preventDefault();
-        console.log("Switching to Batch Processing Tab");
         switchTabs(batchProcessTabLink, singleFileTabLink, batchProcessPane, singleFilePane);
     });
-
-    console.log("Tab switching initialized successfully.");
 }

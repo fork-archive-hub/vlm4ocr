@@ -1,4 +1,5 @@
 import traceback
+import json
 from flask import render_template, request, jsonify, Response, stream_with_context
 from . import app
 from . import app_services
@@ -12,6 +13,7 @@ def index():
         'index.html',
         vlm_api_options=vlm_api_options_data,
     )
+
 
 @app.route('/api/run_ocr', methods=['POST'])
 def handle_ocr_route():
@@ -56,15 +58,45 @@ def handle_tiff_preview_route():
         traceback.print_exc()
         return jsonify({'status': 'error', 'error': f'An internal server error occurred during TIFF preview: {str(e)}'}), 500
 
-@app.route('/api/run_batch_ocr', methods=['POST'])
-def handle_batch_ocr_route():
+@app.route('/api/initiate_batch_ocr', methods=['POST'])
+def handle_initiate_batch_ocr():
+    """
+    Step 1: Accepts file uploads and form data, saves them, 
+    and returns a unique ID for the batch job.
+    """
     try:
-        # This service will handle multiple files and return a zipped response
-        response_object = app_services.process_batch_ocr_request(request)
-        return response_object
+        batch_id = app_services.initiate_batch_job(request)
+        return jsonify({'status': 'success', 'batch_id': batch_id}), 202 # 202 Accepted
     except ValueError as ve:
         traceback.print_exc()
         return jsonify({'status': 'error', 'error': str(ve)}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'status': 'error', 'error': f'An internal server error occurred: {str(e)}'}), 500
+
+@app.route('/api/stream_batch_results/<batch_id>', methods=['GET'])
+def handle_stream_batch_results(batch_id):
+    """
+    Step 2: Streams the results for a given batch_id using Server-Sent Events.
+    """
+    def generate_events():
+        try:
+            for message in app_services.process_batch_ocr_stream(batch_id):
+                yield f"data: {message}\n\n"
+        except Exception as e:
+            error_message = json.dumps({'type': 'error', 'data': f'An internal server error occurred: {str(e)}'})
+            yield f"data: {error_message}\n\n"
+            traceback.print_exc()
+            
+    return Response(stream_with_context(generate_events()), mimetype='text/event-stream')
+
+
+@app.route('/api/download_file/<batch_id>/<filename>')
+def download_file(batch_id, filename):
+    """ Serves a single processed file from a temporary batch directory. """
+    return app_services.download_processed_file(batch_id, filename)
+
+@app.route('/api/download_batch_zip/<batch_id>')
+def download_batch_zip(batch_id):
+    """ Creates a zip archive of all processed files in a batch and sends it. """
+    return app_services.download_batch_as_zip(batch_id)

@@ -1,14 +1,20 @@
 import os
 import json
+import asyncio
 from PIL import Image
 from markdown import markdown
 import io
 import base64
 import traceback
+import uuid
+import zipfile
+import shutil
+import queue
+import threading
+from pathlib import Path
 from werkzeug.utils import secure_filename
-from flask import Response, stream_with_context, jsonify
+from flask import Response, stream_with_context, jsonify, current_app, send_from_directory, url_for, send_file, after_this_request
 from . import app, cleanup_file
-
 
 try:
     from vlm4ocr.ocr_engines import OCREngine
@@ -17,292 +23,308 @@ except ImportError as e:
     print(f"Error importing from vlm4ocr in app_services.py: {e}")
     raise
 
+# A temporary directory to store batch results.
+TEMP_DIR = Path(app.app_config.get("temp_directory", "temp"))
+TEMP_DIR.mkdir(exist_ok=True)
+
+
+def _initialize_ocr_engine(form_data):
+    """
+    Helper function to initialize the OCREngine based on form data.
+    This consolidates the engine setup logic for both single and batch processing.
+    """
+    vlm_api = form_data.get('vlm_api', '')
+    user_prompt = form_data.get('user_prompt', None)
+    output_format = form_data.get('output_format', 'markdown')
+    try:
+        max_new_tokens = int(form_data.get('max_new_tokens', '4096'))
+        temperature = float(form_data.get('temperature', '0.0'))
+    except (ValueError, TypeError):
+        raise ValueError("Invalid value for Max New Tokens or Temperature.")
+
+    print(f"Initializing VLM Engine for API: {vlm_api}")
+    config = BasicVLMConfig(max_new_tokens=max_new_tokens, temperature=temperature)
+
+    vlm_engine = None
+    if vlm_api == "openai_compatible":
+        vlm_engine = OpenAIVLMEngine(
+            model=form_data.get('vlm_model'),
+            api_key=form_data.get('openai_compatible_api_key'),
+            base_url=form_data.get('vlm_base_url'),
+            config=config
+        )
+    elif vlm_api == "openai":
+        vlm_engine = OpenAIVLMEngine(
+            model=form_data.get('openai_model'),
+            api_key=form_data.get('openai_api_key'),
+            config=config
+        )
+    elif vlm_api == "azure_openai":
+        vlm_engine = AzureOpenAIVLMEngine(
+            model=form_data.get('azure_deployment_name'),
+            api_key=form_data.get('azure_openai_api_key'),
+            azure_endpoint=form_data.get('azure_endpoint'),
+            api_version=form_data.get('azure_api_version'),
+            config=config
+        )
+    elif vlm_api == "ollama":
+        vlm_engine = OllamaVLMEngine(
+            model_name=form_data.get('ollama_model'),
+            host=form_data.get('ollama_host', 'http://localhost:11434'),
+            config=config
+        )
+    else:
+        raise ValueError(f'Unsupported VLM API type selected: {vlm_api}')
+
+    print("VLM Engine configured. Initializing OCREngine.")
+    return OCREngine(
+        vlm_engine=vlm_engine,
+        output_mode=output_format,
+        system_prompt=None,
+        user_prompt=user_prompt
+    )
+
+
 def process_ocr_request(request):
     """
-    Handles the core logic for an OCR request.
-    - Validates input file.
-    - Saves the file temporarily.
-    - Initializes VLM and OCR engines based on form data (validating required API keys).
-    - Uses default system prompt from OCREngine.
-    - Returns a streaming Flask Response.
-    - Ensures cleanup of the temporary file.
+    Handles the core logic for a SINGLE FILE OCR request.
+    This version now uses the configurable TEMP_DIR for its uploads.
     """
-    print("Entering app_services.process_ocr_request")
     temp_file_path = None
-    vlm_engine = None
-    ocr_engine = None
-
     try:
-        # 1. File Validation
         if 'input_file' not in request.files:
             raise ValueError("No input file part in request")
         file = request.files['input_file']
         if not file or file.filename == '':
             raise ValueError("No selected file")
 
-        # 2. Save File Securely
+        # --- THIS IS THE KEY CHANGE ---
+        # Save the file to the configurable temp directory
         filename = secure_filename(file.filename)
-        temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        print(f"Saving temporary file to: {temp_file_path}")
+        # We use Path() to ensure the join works correctly on any OS
+        temp_file_path = str(TEMP_DIR / filename) 
         file.save(temp_file_path)
-        print("Temporary file saved.")
 
-        # 3. Get Form Data
-        vlm_api = request.form.get('vlm_api', '')
-        user_prompt = request.form.get('ocr_user_prompt', None)
-        output_format = request.form.get('output_format', 'markdown')
-        max_new_tokens_str = request.form.get('max_new_tokens', '4096') 
-        temperature_str = request.form.get('temperature', '0.0') 
-        
-        try:
-            max_new_tokens = int(max_new_tokens_str)
-        except ValueError:
-            raise ValueError("Invalid value for Max New Tokens. Must be an integer.")
-        try:
-            temperature = float(temperature_str)
-        except ValueError:
-            raise ValueError("Invalid value for Temperature. Must be a number.")
+        ocr_engine = _initialize_ocr_engine(request.form)
 
-        print(f"Selected output format: {output_format}")
-        print(f"Received max_new_tokens: {max_new_tokens}, temperature: {temperature}")
-
-
-        vlm_model_compatible = request.form.get('vlm_model', None)
-        openai_model_openai = request.form.get('openai_model', None)
-        azure_deployment_name = request.form.get('azure_deployment_name', None)
-        vlm_base_url = request.form.get('vlm_base_url', None)
-        azure_endpoint = request.form.get('azure_endpoint', None)
-        azure_api_version = request.form.get('azure_api_version', None)
-        ollama_host = request.form.get('ollama_host', 'http://localhost:11434')
-        ollama_model = request.form.get('ollama_model', None)
-
-        print(f"Extracted form data: vlm_api={vlm_api}, output_format={output_format}")
-
-        # 4. Initialize VLM Engine
-        print("Initializing VLM Engine...")
-        config = BasicVLMConfig(max_new_tokens=max_new_tokens, temperature=temperature)
-
-        vlm_api_key = None
-        if vlm_api == "openai_compatible":
-            vlm_api_key = request.form.get('openai_compatible_api_key', None)
-            if not vlm_api_key: raise ValueError("API Key is required for OpenAI Compatible mode.")
-            if not vlm_model_compatible: raise ValueError("Model name is required for OpenAI Compatible mode.")
-            if not vlm_base_url: raise ValueError("Base URL is required for OpenAI Compatible mode.")
-            print(f"Configuring OpenAIVLMEngine (Compatible): model={vlm_model_compatible}, base_url={vlm_base_url}")
-            vlm_engine = OpenAIVLMEngine(
-                model=vlm_model_compatible,
-                api_key=vlm_api_key,
-                base_url=vlm_base_url,
-                config=config
-            )
-        elif vlm_api == "openai":
-            vlm_api_key = request.form.get('openai_api_key', None)
-            if not openai_model_openai: raise ValueError("Model name is required for OpenAI mode.")
-            if not vlm_api_key: raise ValueError("OpenAI API Key is required for OpenAI mode.")
-            print(f"Configuring OpenAIVLMEngine (OpenAI): model={openai_model_openai}")
-            vlm_engine = OpenAIVLMEngine(model=openai_model_openai, api_key=vlm_api_key, config=config)
-        elif vlm_api == "azure_openai":
-            vlm_api_key = request.form.get('azure_openai_api_key', None)
-            if not azure_deployment_name: raise ValueError("Model/Deployment Name is required for Azure OpenAI mode.")
-            if not azure_endpoint: raise ValueError("Azure Endpoint is required for Azure OpenAI mode.")
-            if not azure_api_version: raise ValueError("Azure API Version is required for Azure OpenAI mode.")
-            if not vlm_api_key: raise ValueError("Azure API Key is required for Azure OpenAI mode.")
-            print(f"Configuring AzureOpenAIVLMEngine: model={azure_deployment_name}, endpoint={azure_endpoint}, api_version={azure_api_version}")
-            vlm_engine = AzureOpenAIVLMEngine(model=azure_deployment_name, api_key=vlm_api_key, azure_endpoint=azure_endpoint, api_version=azure_api_version, config=config)
-        elif vlm_api == "ollama":
-            if not ollama_model: raise ValueError("Model name is required for Ollama mode.")
-            host_to_use = ollama_host if ollama_host else 'http://localhost:11434'
-            print(f"Configuring OllamaVLMEngine: model={ollama_model}, host={host_to_use}")
-            vlm_engine = OllamaVLMEngine(
-                model_name=ollama_model,
-                host=host_to_use,
-                config=config
-            )
-        else:
-            raise ValueError(f'Unsupported VLM API type selected: {vlm_api}')
-        print("VLM Engine configured.")
-
-        # 5. Initialize OCREngine
-        print(f"Initializing OCREngine with output_mode: {output_format}...")
-        ocr_engine = OCREngine(
-            vlm_engine=vlm_engine,
-            output_mode=output_format,
-            system_prompt=None, 
-            user_prompt=user_prompt
-        )
-        print("OCREngine initialized.")
-
-        # 6. Define the Streaming Generator
         def generate_ocr_stream(ocr_eng, file_to_process_path):
-            print(f"generate_ocr_stream called for: {file_to_process_path}")
             try:
-                print(f"Starting OCREngine.stream_ocr for: {file_to_process_path}")
                 for item_dict in ocr_eng.stream_ocr(file_path=file_to_process_path):
                     yield json.dumps(item_dict) + '\n'
-                print(f"Finished OCREngine.stream_ocr for: {file_to_process_path}")
-            except ValueError as val_err:
-                print(f"--- Value Error during OCR stream: {val_err} ---")
-                traceback.print_exc()
-                error_obj = {"type": "error", "data": f"Streaming Error: {str(val_err)}"}
+            except Exception as e:
+                error_obj = {"type": "error", "data": f"Streaming Failed: {str(e)}"}
                 yield json.dumps(error_obj) + '\n'
-            except Exception as stream_err:
-                print(f"--- Error Traceback during OCR stream generation ---")
                 traceback.print_exc()
-                error_obj = {"type": "error", "data": f"Streaming Failed: An unexpected error occurred during processing: {str(stream_err)}"}
-                yield json.dumps(error_obj) + '\n'
             finally:
-                print(f"Calling cleanup_file from generate_ocr_stream finally block for {file_to_process_path}")
+                # The cleanup_file function will now delete from the correct temp folder
                 cleanup_file(file_to_process_path, "post-stream cleanup")
 
-        # 7. Return Streaming Response
-        print("Setup complete. Returning streaming response object.")
         return Response(stream_with_context(generate_ocr_stream(ocr_engine, temp_file_path)), mimetype='application/x-ndjson')
 
-    except (ValueError, FileNotFoundError) as setup_val_err:
-        print(f"--- Setup Validation Error in app_services: {setup_val_err} ---")
-        traceback.print_exc()
+    except (ValueError, FileNotFoundError) as setup_err:
         if temp_file_path:
-             print(f"Calling cleanup_file due to setup error for {temp_file_path}")
-             cleanup_file(temp_file_path, "setup validation error cleanup")
-        raise setup_val_err 
+            cleanup_file(temp_file_path, "setup error cleanup")
+        raise setup_err
     except Exception as setup_err:
-        print(f"--- Unexpected Setup Error in app_services: {setup_err} ---")
-        traceback.print_exc()
         if temp_file_path:
-             print(f"Calling cleanup_file due to unexpected setup error for {temp_file_path}")
-             cleanup_file(temp_file_path, "setup general error cleanup")
+            cleanup_file(temp_file_path, "setup general error cleanup")
         raise Exception(f"Failed during OCR setup: {setup_err}")
 
 
+def initiate_batch_job(request):
+    """
+    Saves files and form data for a new batch job and returns the job ID.
+    """
+    batch_id = str(uuid.uuid4())
+    batch_dir = TEMP_DIR / batch_id
+    batch_dir.mkdir(exist_ok=True)
+    
+    # Save form data
+    form_data_path = batch_dir / 'form_data.json'
+    with open(form_data_path, 'w') as f:
+        json.dump(request.form.to_dict(), f)
+        
+    # Save files
+    files = request.files.getlist('batch_input_files')
+    if not files or all(f.filename == '' for f in files):
+        raise ValueError("No files were provided for batch processing.")
+        
+    for file in files:
+        filename = secure_filename(file.filename)
+        file.save(batch_dir / filename)
+        
+    return batch_id
+
+
+def process_batch_ocr_stream(batch_id):
+    """
+    Finds a batch job by its ID, processes it, and streams results.
+    This function uses a thread-safe queue to bridge the async OCR engine
+    with the sync Flask context, ensuring robust error handling and
+    graceful connection management.
+    """
+    q = queue.Queue()
+    # Get a safe reference to the current Flask app object
+    app = current_app._get_current_object()
+
+    def run_async_ocr_worker():
+        """
+        This worker function runs in a separate background thread.
+        It handles the heavy OCR processing and puts results into the queue.
+        """
+        # Establish an application context for this background thread.
+        # This is crucial for allowing functions like url_for() to work.
+        with app.app_context():
+            # Create a new asyncio event loop for this thread.
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                batch_dir = TEMP_DIR / batch_id
+                form_data_path = batch_dir / 'form_data.json'
+
+                if not batch_dir.exists() or not form_data_path.exists():
+                    q.put(json.dumps({'type': 'error', 'data': f'Batch job {batch_id} not found or is invalid.'}))
+                    return
+
+                with open(form_data_path, 'r') as f:
+                    form_data = json.load(f)
+
+                # Initialize the OCR engine using the helper function
+                ocr_engine = _initialize_ocr_engine(form_data)
+
+                # Safely get the output format extension
+                output_format_ext_map = {"text": "txt", "markdown": "md", "HTML": "html"}
+                output_format = form_data.get('output_format', 'markdown')
+                output_format_ext = output_format_ext_map.get(output_format, 'md')
+
+                # Get the paths of the image files to be processed
+                image_paths = [str(p) for p in batch_dir.iterdir() if p.is_file() and p.suffix.lower() not in ['.json']]
+
+                async def process_and_queue_results():
+                    """The async coroutine that calls the OCR library."""
+                    response_generator = ocr_engine.concurrent_ocr(
+                        file_paths=image_paths, concurrent_batch_size=4
+                    )
+                    async for result in response_generator:
+                        if result.status == "success":
+                            output_filename = f"{Path(result.filename).stem}.{output_format_ext}"
+                            output_content = result.to_string()
+                            with open(batch_dir / output_filename, "w", encoding="utf-8") as f:
+                                f.write(output_content)
+                            
+                            # Build the full external URL, now safely within the app context
+                            download_url = url_for('download_file', batch_id=batch_id, filename=output_filename, _external=True)
+                            q.put(json.dumps({'type': 'result', 'filename': output_filename, 'download_url': download_url}))
+                        else:
+                            error_data = getattr(result, 'error_message', 'An unknown processing error occurred.')
+                            q.put(json.dumps({'type': 'error', 'filename': Path(result.filename).name, 'data': error_data}))
+
+                # Run the async OCR process to completion
+                loop.run_until_complete(process_and_queue_results())
+
+            except Exception as e:
+                # If any error occurs, send the full traceback to the client
+                print("--- CRITICAL ERROR IN BATCH WORKER THREAD ---")
+                traceback.print_exc()
+                error_trace = traceback.format_exc()
+                q.put(json.dumps({'type': 'error', 'data': f'A critical server error occurred:\n{error_trace}'}))
+            finally:
+                # IMPORTANT: Always put a sentinel value at the end to signal completion.
+                q.put(None)
+
+    # Start the background thread
+    thread = threading.Thread(target=run_async_ocr_worker)
+    thread.start()
+
+    # In the main Flask thread, yield messages from the queue as they arrive
+    while True:
+        message = q.get() # This blocks until a message is available
+        if message is None:
+            # The sentinel value has been received; the worker is done.
+            # Send the final 'completed' message from the main thread.
+            yield json.dumps({'type': 'completed', 'batch_id': batch_id})
+            break # Exit the loop and allow Flask to close the connection gracefully
+        
+        yield message
+
+def download_processed_file(batch_id, filename):
+    """Serves a single file from a specific batch directory."""
+    directory = TEMP_DIR / str(batch_id)
+    return send_from_directory(directory, filename, as_attachment=True)
+
+
+def download_batch_as_zip(batch_id):
+    """
+    Zips the processed output files and cleans up the temporary directory
+    after the request is complete.
+    """
+    directory = TEMP_DIR / str(batch_id)
+    memory_file = io.BytesIO()
+    
+    output_extensions = ('.md', '.txt', '.html')
+
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for f in directory.iterdir():
+            # Your logic to include form_data.json is preserved
+            if f.is_file() and (f.name.lower().endswith(output_extensions) or f.name.lower() == "form_data.json"):
+                zf.write(f, arcname=f.name)
+                
+    memory_file.seek(0)
+
+    @after_this_request
+    def cleanup(response):
+        """This function is called after the response has been sent."""
+        try:
+            print(f"Cleaning up temporary directory: {directory}")
+            shutil.rmtree(directory)
+        except Exception as e:
+            print(f"Error during cleanup of {directory}: {e}")
+        return response
+
+    if not memory_file.getbuffer().nbytes:
+        return "No processed files found to download.", 404
+
+    return send_file(
+        memory_file,
+        download_name=f'batch_results_{batch_id}.zip',
+        as_attachment=True,
+        mimetype='application/zip'
+    )
+
+
 def render_markdown_text(request):
-    """
-    Renders a given text string as HTML.
-    """
+    """Renders a given text string as HTML."""
     data = request.get_json()
     if 'text' not in data:
         raise ValueError("No text provided for rendering.")
-
-    text_to_render = data['text']
-    
-    # Sanitize and render the markdown
-    html = markdown(text_to_render, extensions=['fenced_code', 'tables'])
-    
+    html = markdown(data['text'], extensions=['fenced_code', 'tables'])
     return jsonify({'status': 'success', 'html': html})
-
-def process_batch_ocr_request(request):
-    """
-    Handles the core logic for a batch OCR request.
-    - Validates input files.
-    - Saves files temporarily.
-    - (Future step) Initializes engines.
-    - (Future step) Processes files concurrently.
-    - (Future step) Zips the results and returns them.
-    - Ensures cleanup.
-    """
-    print("Entering app_services.process_batch_ocr_request")
-    temp_file_paths = []
-    try:
-        # 1. File Validation
-        if 'batch_input_files' not in request.files:
-            raise ValueError("No input file part in request")
-
-        files = request.files.getlist('batch_input_files')
-        if not files or all(f.filename == '' for f in files):
-            raise ValueError("No selected files for batch processing")
-
-        # 2. Save Files Securely
-        for file in files:
-            if file and file.filename:
-                filename = secure_filename(file.filename)
-                temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(temp_file_path)
-                temp_file_paths.append(temp_file_path)
-                print(f"Saved temporary file: {temp_file_path}")
-
-        # --- Placeholder for further processing ---
-        # In the next steps, we will add the logic here to:
-        # - Initialize the VLM and OCR engines
-        # - Process each file using ocr_engine.concurrent_ocr
-        # - Collect the results
-        # - Zip the output files
-        # - Return the zip file for download
-
-        # For now, just return a success message
-        return jsonify({
-            'status': 'success',
-            'message': f'Successfully uploaded {len(temp_file_paths)} files.',
-            'filenames': [os.path.basename(p) for p in temp_file_paths]
-        })
-
-    except (ValueError, FileNotFoundError) as setup_val_err:
-        print(f"--- Setup Validation Error in batch process: {setup_val_err} ---")
-        traceback.print_exc()
-        raise setup_val_err
-    except Exception as setup_err:
-        print(f"--- Unexpected Setup Error in batch process: {setup_err} ---")
-        traceback.print_exc()
-        raise Exception(f"Failed during batch OCR setup: {setup_err}")
-    finally:
-        # Cleanup all saved temporary files
-        for path in temp_file_paths:
-            cleanup_file(path, "batch cleanup")
 
 
 def process_tiff_preview_request(request):
-    """
-    Handles a TIFF preview request.
-    - Validates input file.
-    - Saves the TIFF temporarily.
-    - Converts ALL pages of the TIFF to PNGs.
-    - Returns a list of PNGs as base64 encoded strings.
-    - Ensures cleanup of the temporary file.
-    """
-    print("Entering app_services.process_tiff_preview_request for all pages")
+    """Handles a TIFF preview request."""
     temp_file_path = None
     try:
         if 'tiff_file' not in request.files:
             raise ValueError("No tiff_file part in request")
         file = request.files['tiff_file']
-        if not file or file.filename == '':
-            raise ValueError("No selected TIFF file")
-
-        if not (file.filename.lower().endswith('.tif') or file.filename.lower().endswith('.tiff')):
-            raise ValueError("Invalid file type. Expected a TIFF file.")
+        if not file or file.filename == '' or not (file.filename.lower().endswith('.tif') or file.filename.lower().endswith('.tiff')):
+            raise ValueError("Invalid TIFF file provided.")
 
         filename = secure_filename(file.filename)
-        temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"preview_tiff_{filename}")
-        print(f"Saving temporary TIFF for preview to: {temp_file_path}")
+        temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"preview_{filename}")
         file.save(temp_file_path)
-        print("Temporary TIFF saved.")
 
         base64_png_pages = []
         with Image.open(temp_file_path) as img:
-            print(f"TIFF file opened. Number of frames: {img.n_frames}")
             for i in range(img.n_frames):
                 img.seek(i)
-                
-                page_image = img
-                if page_image.mode != 'RGB':
-                    page_image = page_image.convert('RGB')
-                
+                page_image = img.convert('RGB')
                 buffered = io.BytesIO()
                 page_image.save(buffered, format="PNG")
-                png_bytes = buffered.getvalue()
-                base64_png_string = base64.b64encode(png_bytes).decode('utf-8')
-                base64_png_pages.append(base64_png_string)
-                print(f"Converted page {i+1}/{img.n_frames} of TIFF to base64 PNG string.")
+                base64_png_pages.append(base64.b64encode(buffered.getvalue()).decode('utf-8'))
         
-        if not base64_png_pages:
-            raise ValueError("No pages could be extracted or converted from the TIFF file.")
-
-        print(f"All {len(base64_png_pages)} TIFF pages converted to base64 PNG strings.")
         return {'status': 'success', 'pages_data': base64_png_pages, 'format': 'png'}
-
-    except Exception as e:
-        print(f"--- Error in process_tiff_preview_request: {e} ---")
-        traceback.print_exc()
-        raise ValueError(f"Failed to process TIFF for preview: {str(e)}")
     finally:
         if temp_file_path:
-            print(f"Calling cleanup_file from process_tiff_preview_request finally block for {temp_file_path}")
             cleanup_file(temp_file_path, "tiff preview cleanup")

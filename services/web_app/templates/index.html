@@ -156,14 +156,12 @@
     </div>
     <!-- End of Single File Tab Pane -->
 
-
     <!-- =============================== -->
     <!-- == Batch Processing Tab Pane == -->
     <!-- =============================== -->
     <div class="tab-pane fade" id="batch-process-pane" role="tabpanel" aria-labelledby="batch-process-tab-link">
         <div class="tab-pane-grid">
-             <!-- Left Control Panel (for Batch) -->
-            <div class="controls-panel">
+             <div class="controls-panel">
                 <form id="batch-ocr-form">
                     <div class="form-group file-drop-zone">
                         <label for="batch-input-file">Upload Multiple Files:</label>
@@ -187,8 +185,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
-                    <!-- Conditional Options for Batch Form -->
+
                     <div id="batch-openai-compatible-options" class="conditional-options indented-option" style="display: none;">
                         <div class="form-group">
                             <label for="batch-openai-compatible-api-key">API Key:</label>
@@ -240,8 +237,6 @@
                             <input type="text" id="batch-ollama-model" name="ollama_model" placeholder="Enter Ollama model name (e.g., llama3.2-vision)" class="api-input">
                         </div>
                     </div>
-                    <!-- End Conditional Options -->
-
                     <details class="form-group">
                         <summary style="cursor: pointer; font-weight: bold; margin-bottom: 10px;">Advanced OCR Settings</summary>
                         <div class="indented-option">
@@ -262,7 +257,6 @@
                     <button type="submit" id="run-batch-ocr-button">Run Batch OCR</button>
                 </form>
             </div>
-            <!-- Right Display Panel (split into 2 columns for batch) -->
             <div class="display-panel">
                 <div class="display-column">
                     <h3>Input File List</h3>
