@@ -205,7 +205,6 @@ document.addEventListener('DOMContentLoaded', function () {
         runBatchOcrButton.disabled = true;
         runBatchOcrButton.textContent = 'Uploading...';
         batchOutputFileListhArea.innerHTML = '<p class="ocr-status-message">Uploading files and initiating batch job...</p>';
-        document.getElementById('batch-download-all-button')?.remove(); // Remove old button if it exists
 
         // --- Step 1: Initiate the batch job via POST ---
         fetch('/api/initiate_batch_ocr', {
@@ -291,18 +290,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 runBatchOcrButton.disabled = false;
                 runBatchOcrButton.textContent = 'Run Batch OCR';
 
-                // 3. Create and show the "Download All" button
-                const downloadAllButton = document.createElement('a');
-                downloadAllButton.id = 'batch-download-all-button';
-                downloadAllButton.href = `/api/download_batch_zip/${message.batch_id}`;
-                downloadAllButton.className = 'btn btn-success mt-3';
-                downloadAllButton.innerHTML = '<i class="fas fa-file-archive"></i> Download All as ZIP';
-                
-                // Append it after the list of files, ensuring no duplicates
-                const existingButton = document.getElementById('batch-download-all-button');
-                if (!existingButton) {
-                    batchOutputFileListhArea.insertAdjacentElement('afterend', downloadAllButton);
-                }
+                // 3. Enable the "Download All" button
+                const downloadAllLink = document.getElementById('batch-download-all-button');
+                downloadAllLink.href = `/api/download_batch_zip/${message.batch_id}`;
+                downloadAllLink.classList.remove('btn-disabled');
+                downloadAllLink.removeAttribute('aria-disabled');
             }
         };
 

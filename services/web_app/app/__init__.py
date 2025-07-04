@@ -2,6 +2,7 @@ import os
 import yaml
 from easydict import EasyDict
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 """ Define configuration Paths """
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,7 +43,13 @@ app = Flask(__name__,
             instance_relative_config=False, 
             template_folder='../templates',
             static_folder='../static')
-app.config['SERVER_NAME'] = '10.0.0.65:5000'
+
+server_name = os.environ.get('SERVER_NAME', None)
+if server_name:
+    app.config['SERVER_NAME'] = server_name
+
+# Add the ProxyFix middleware
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 """ Load App-Specific Config from YAML """
 print(f"Loading app config from: {CONFIG_PATH}")
