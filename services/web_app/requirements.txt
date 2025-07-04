@@ -7,3 +7,5 @@ gunicorn==22.0.0
 openai==1.68.2
 ollama==0.4.5
 colorama==0.4.6
+markdown==3.8
+json-repair==0.30.3

@@ -17,6 +17,7 @@ python = "^3.11"
 pdf2image = ">=1.16.0"
 colorama = ">=0.4.4"
 pillow = ">=10.0.0"
+json-repair = ">=0.30.0"
 pytesseract = { version = ">=0.3.13", optional = true }
 
 [tool.poetry.scripts]
