@@ -13,6 +13,8 @@ packages/vlm4ocr/tests
 # web app
 services/web_app/tests
 services/web_app/uploads
+nginx/certs/nginx-selfsigned.crt
+nginx/certs/nginx-selfsigned.key
 
 # internal documentation
 docs/release_notes
