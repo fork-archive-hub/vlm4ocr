@@ -41,9 +41,8 @@
                     <div class="form-group">
                         <label for="vlm-api-select">Choose VLM API:</label>
                         <select id="vlm-api-select" name="vlm_api" required>
-                            <option value="" disabled selected>-- select VLM API --</option>
                             {% for api in vlm_api_options %}
-                                <option value="{{ api.value }}">{{ api.name }}</option>
+                                <option value="{{ api.value }}" {% if loop.first %}selected{% endif %}>{{ api.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -182,9 +181,8 @@
                     <div class="form-group">
                         <label for="batch-vlm-api-select">Choose VLM API:</label>
                         <select id="batch-vlm-api-select" name="vlm_api" required>
-                             <option value="" disabled selected>-- select VLM API --</option>
                             {% for api in vlm_api_options %}
-                                <option value="{{ api.value }}">{{ api.name }}</option>
+                                <option value="{{ api.value }}" {% if loop.first %}selected{% endif %}>{{ api.name }}</option>
                             {% endfor %}
                         </select>
                     </div>

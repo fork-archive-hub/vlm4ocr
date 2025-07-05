@@ -34,4 +34,7 @@ function initializeTabSwitching() {
         event.preventDefault();
         switchTabs(batchProcessTabLink, singleFileTabLink, batchProcessPane, singleFilePane);
     });
+
+    document.getElementById('vlm-api-select').dispatchEvent(new Event('change'));
+    document.getElementById('batch-vlm-api-select').dispatchEvent(new Event('change'));
 }
