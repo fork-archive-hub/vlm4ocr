@@ -18,5 +18,7 @@ batch_processing:
   max_files: 100
 
 # File upload settings
+# max_size_mb limits the size per request. For single file processing, this limits the file size. 
+# For batch processing, this limits the total size of all files.
 file_upload:
   max_size_mb: 100

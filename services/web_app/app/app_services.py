@@ -168,21 +168,26 @@ def initiate_batch_job(request):
     batch_id = str(uuid.uuid4())
     batch_dir = Path(current_app.config["temp_directory"]) / batch_id
     batch_dir.mkdir(exist_ok=True)
-    
+
     # Save form data
     form_data_path = batch_dir / 'form_data.json'
     with open(form_data_path, 'w') as f:
         json.dump(request.form.to_dict(), f)
-        
+
     # Save files
     files = request.files.getlist('batch_input_files')
     if not files or all(f.filename == '' for f in files):
         raise ValueError("No files were provided for batch processing.")
-        
+
+    # Check against the maximum number of files allowed
+    max_files = current_app.config.get('batch_processing', {}).get('max_files', 100)
+    if len(files) > max_files:
+        raise ValueError(f"Too many files. The maximum is {max_files}.")
+
     for file in files:
         filename = secure_filename(file.filename)
         file.save(batch_dir / filename)
-        
+
     return batch_id
 
 

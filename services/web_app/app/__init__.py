@@ -41,8 +41,8 @@ def cleanup_file(file_path, context="cleanup"):
 
 """ Flask App Initialization """
 print("Initializing Flask app...")
-app = Flask(__name__, 
-            instance_relative_config=False, 
+app = Flask(__name__,
+            instance_relative_config=False,
             template_folder='../templates',
             static_folder='../static')
 
@@ -55,6 +55,11 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 """ Load App-Specific Config from YAML """
 print(f"Loading app config from: {CONFIG_PATH}")
 app.config.update(load_app_config(CONFIG_PATH))
+
+""" Set the maximum file upload size from the config """
+if 'file_upload' in app.config and app.config.get('file_upload').get('max_size_mb'):
+    # This line configures Flask's internal request handling to reject requests with bodies larger than the specified size
+    app.config['MAX_CONTENT_LENGTH'] = app.config['file_upload']['max_size_mb'] * 1024 * 1024
 
 """ Create Temporary Directory """
 # check if "temp_directory" key exists in config
