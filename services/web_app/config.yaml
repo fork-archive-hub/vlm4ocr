@@ -14,7 +14,7 @@ temp_directory: "services/web_app/temp"
 
 # Batch processing settings
 batch_processing:
-  batch_size: 4
+  concurrent_batch_size: 2
   max_files: 100
 
 # File upload settings

@@ -222,10 +222,11 @@ def process_batch_ocr_stream(batch_id, base_url):
                 output_format_ext = output_format_ext_map.get(output_format, 'md')
                 image_paths = [str(p) for p in batch_dir.iterdir() if p.is_file() and p.suffix.lower() not in ['.json']]
 
-                async def process_and_queue_results():
+                async def process_and_queue_results(concurrent_batch_size:int):
                     """The async coroutine that calls the OCR library."""
                     response_generator = ocr_engine.concurrent_ocr(
-                        file_paths=image_paths, concurrent_batch_size=4
+                        file_paths=image_paths, 
+                        concurrent_batch_size=concurrent_batch_size
                     )
                     async for result in response_generator:
                         if result.status == "success":
@@ -240,7 +241,9 @@ def process_batch_ocr_stream(batch_id, base_url):
                             error_data = getattr(result, 'error_message', 'Unknown error.')
                             q.put(json.dumps({'type': 'error', 'filename': Path(result.filename).name, 'data': error_data}))
 
-                loop.run_until_complete(process_and_queue_results())
+                batch_processing_config = current_app.config.get("batch_processing", {})
+                concurrent_batch_size = batch_processing_config.get("concurrent_batch_size", 4)
+                loop.run_until_complete(process_and_queue_results(concurrent_batch_size))
 
             except Exception as e:
                 print("--- CRITICAL ERROR IN BATCH WORKER THREAD ---")
