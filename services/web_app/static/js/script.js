@@ -160,6 +160,14 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateBatchFileList() {
         if (!batchInputFileListArea || !batchFileInput.files) return;
 
+        const maxFiles = parseInt(batchFileInput.getAttribute('data-max-files'), 10) || 100;
+        if (batchFileInput.files.length > maxFiles) {
+            alert(`You can only select a maximum of ${maxFiles} files.`);
+            batchFileInput.value = ''; // Clear the selection
+            batchInputFileListArea.innerHTML = '<p class="ocr-status-message">Please select files (up to ' + maxFiles + ').</p>';
+            return;
+        }
+
         batchInputFileListArea.innerHTML = ''; // Clear previous list
 
         if (batchFileInput.files.length === 0) {

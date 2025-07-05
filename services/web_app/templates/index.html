@@ -165,7 +165,10 @@
                 <form id="batch-ocr-form">
                     <div class="form-group file-drop-zone">
                         <label for="batch-input-file">Upload Multiple Files:</label>
-                        <input type="file" id="batch-input-file" name="batch_input_files" accept=".pdf,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff" required multiple>
+                        <input type="file" id="batch-input-file" name="batch_input_files"
+                               accept=".pdf,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff"
+                               required multiple
+                               data-max-files="{{ config.batch_processing.max_files | default(100) }}">
                         <div class="drop-zone-text">Drag & drop files here</div>
                     </div>
                     <div class="form-group">
