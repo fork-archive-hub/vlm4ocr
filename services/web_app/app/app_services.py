@@ -8,13 +8,12 @@ import base64
 import traceback
 import uuid
 import zipfile
-import shutil
 import queue
 import threading
 from pathlib import Path
 from werkzeug.utils import secure_filename
-from flask import Response, stream_with_context, jsonify, current_app, send_from_directory, url_for, send_file, after_this_request
-from . import app, cleanup_file
+from flask import Response, stream_with_context, jsonify, current_app, url_for, send_file
+from . import cleanup_file
 
 try:
     from vlm4ocr.ocr_engines import OCREngine
@@ -22,10 +21,6 @@ try:
 except ImportError as e:
     print(f"Error importing from vlm4ocr in app_services.py: {e}")
     raise
-
-# A temporary directory to store batch results.
-TEMP_DIR = Path(app.app_config.get("temp_directory", "temp"))
-TEMP_DIR.mkdir(exist_ok=True)
 
 
 def _initialize_ocr_engine(form_data):
@@ -85,6 +80,44 @@ def _initialize_ocr_engine(form_data):
     )
 
 
+def render_markdown_text(request):
+    """Renders a given text string as HTML."""
+    data = request.get_json()
+    if 'text' not in data:
+        raise ValueError("No text provided for rendering.")
+    html = markdown(data['text'], extensions=['fenced_code', 'tables'])
+    return jsonify({'status': 'success', 'html': html})
+
+
+def process_tiff_preview_request(request):
+    """Handles a TIFF preview request."""
+    directory = Path(current_app.config["temp_directory"])
+    try:
+        if 'tiff_file' not in request.files:
+            raise ValueError("No tiff_file part in request")
+        file = request.files['tiff_file']
+        if not file or file.filename == '' or not (file.filename.lower().endswith('.tif') or file.filename.lower().endswith('.tiff')):
+            raise ValueError("Invalid TIFF file provided.")
+
+        filename = secure_filename(file.filename)
+        temp_file_path = os.path.join(directory, f"preview_{filename}")
+        file.save(temp_file_path)
+
+        base64_png_pages = []
+        with Image.open(temp_file_path) as img:
+            for i in range(img.n_frames):
+                img.seek(i)
+                page_image = img.convert('RGB')
+                buffered = io.BytesIO()
+                page_image.save(buffered, format="PNG")
+                base64_png_pages.append(base64.b64encode(buffered.getvalue()).decode('utf-8'))
+        
+        return {'status': 'success', 'pages_data': base64_png_pages, 'format': 'png'}
+    finally:
+        if temp_file_path:
+            cleanup_file(temp_file_path, "tiff preview cleanup")
+
+
 def process_ocr_request(request):
     """
     Handles the core logic for a SINGLE FILE OCR request.
@@ -98,11 +131,9 @@ def process_ocr_request(request):
         if not file or file.filename == '':
             raise ValueError("No selected file")
 
-        # --- THIS IS THE KEY CHANGE ---
         # Save the file to the configurable temp directory
         filename = secure_filename(file.filename)
-        # We use Path() to ensure the join works correctly on any OS
-        temp_file_path = str(TEMP_DIR / filename) 
+        temp_file_path = str(Path(current_app.config["temp_directory"]) / filename) 
         file.save(temp_file_path)
 
         ocr_engine = _initialize_ocr_engine(request.form)
@@ -116,7 +147,6 @@ def process_ocr_request(request):
                 yield json.dumps(error_obj) + '\n'
                 traceback.print_exc()
             finally:
-                # The cleanup_file function will now delete from the correct temp folder
                 cleanup_file(file_to_process_path, "post-stream cleanup")
 
         return Response(stream_with_context(generate_ocr_stream(ocr_engine, temp_file_path)), mimetype='application/x-ndjson')
@@ -136,7 +166,7 @@ def initiate_batch_job(request):
     Saves files and form data for a new batch job and returns the job ID.
     """
     batch_id = str(uuid.uuid4())
-    batch_dir = TEMP_DIR / batch_id
+    batch_dir = Path(current_app.config["temp_directory"]) / batch_id
     batch_dir.mkdir(exist_ok=True)
     
     # Save form data
@@ -155,8 +185,6 @@ def initiate_batch_job(request):
         
     return batch_id
 
-
-# In services/web_app/app/app_services.py
 
 def process_batch_ocr_stream(batch_id, base_url):
     """
@@ -178,7 +206,7 @@ def process_batch_ocr_stream(batch_id, base_url):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                batch_dir = TEMP_DIR / batch_id
+                batch_dir = Path(current_app.config["temp_directory"]) / batch_id
                 form_data_path = batch_dir / 'form_data.json'
 
                 if not batch_dir.exists() or not form_data_path.exists():
@@ -253,13 +281,12 @@ def download_processed_file(batch_id, filename):
     now using a robust method to construct the absolute path.
     """
     try:
-        relative_path = TEMP_DIR / str(batch_id) / filename
+        relative_path = Path(current_app.config["temp_directory"]) / str(batch_id) / filename
         absolute_path = Path("/app") / relative_path
         return send_file(absolute_path, as_attachment=True)
 
     except FileNotFoundError as e:
         current_app.logger.error(f"Caught FileNotFoundError in service: {e}")
-        # Re-raise to be caught by the route
         raise e
     except Exception as e:
         current_app.logger.error(f"An unexpected exception occurred in download_processed_file: {e}")
@@ -272,7 +299,7 @@ def download_batch_as_zip(batch_id):
     Zips the processed output files and cleans up the temporary directory
     after the request is complete.
     """
-    directory = TEMP_DIR / str(batch_id)
+    directory = Path(current_app.config["temp_directory"]) / str(batch_id)
     memory_file = io.BytesIO()
     
     output_extensions = ('.md', '.txt', '.html')
@@ -293,41 +320,3 @@ def download_batch_as_zip(batch_id):
         as_attachment=True,
         mimetype='application/zip'
     )
-
-
-def render_markdown_text(request):
-    """Renders a given text string as HTML."""
-    data = request.get_json()
-    if 'text' not in data:
-        raise ValueError("No text provided for rendering.")
-    html = markdown(data['text'], extensions=['fenced_code', 'tables'])
-    return jsonify({'status': 'success', 'html': html})
-
-
-def process_tiff_preview_request(request):
-    """Handles a TIFF preview request."""
-    temp_file_path = None
-    try:
-        if 'tiff_file' not in request.files:
-            raise ValueError("No tiff_file part in request")
-        file = request.files['tiff_file']
-        if not file or file.filename == '' or not (file.filename.lower().endswith('.tif') or file.filename.lower().endswith('.tiff')):
-            raise ValueError("Invalid TIFF file provided.")
-
-        filename = secure_filename(file.filename)
-        temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"preview_{filename}")
-        file.save(temp_file_path)
-
-        base64_png_pages = []
-        with Image.open(temp_file_path) as img:
-            for i in range(img.n_frames):
-                img.seek(i)
-                page_image = img.convert('RGB')
-                buffered = io.BytesIO()
-                page_image.save(buffered, format="PNG")
-                base64_png_pages.append(base64.b64encode(buffered.getvalue()).decode('utf-8'))
-        
-        return {'status': 'success', 'pages_data': base64_png_pages, 'format': 'png'}
-    finally:
-        if temp_file_path:
-            cleanup_file(temp_file_path, "tiff preview cleanup")

@@ -11,7 +11,7 @@ from . import app_services
 @app.route('/')
 def index():
     """Renders the main index page with VLM options from app config."""
-    vlm_api_options_data = app.app_config.get("vlm_api_options", [])
+    vlm_api_options_data = current_app.config.get("vlm_api_options", [])
 
     return render_template(
         'index.html',

@@ -3,6 +3,7 @@ import yaml
 from easydict import EasyDict
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
+from pathlib import Path
 import logging
 
 """ Define configuration Paths """
@@ -45,22 +46,26 @@ app = Flask(__name__,
             template_folder='../templates',
             static_folder='../static')
 
-app.logger.setLevel(logging.INFO)
+# Set for debugging
+# app.logger.setLevel(logging.INFO)
 
-server_name = os.environ.get('SERVER_NAME', None)
-if server_name:
-    app.config['SERVER_NAME'] = server_name
-
-# Add the ProxyFix middleware
+""" Add the ProxyFix middleware """
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 """ Load App-Specific Config from YAML """
 print(f"Loading app config from: {CONFIG_PATH}")
-app.app_config = load_app_config(CONFIG_PATH)
+app.config.update(load_app_config(CONFIG_PATH))
+
+""" Create Temporary Directory """
+# check if "temp_directory" key exists in config
+if "temp_directory" not in app.config:
+    raise ValueError("temp_directory key not found in app config")
+# create temp directory if it doesn't exist
+temp_dir = Path(app.config.get("temp_directory", "temp"))
+temp_dir.mkdir(exist_ok=True)
 
 """ Import Routes (must be done after app is created) """
 print("Importing routes...")
-# Use a relative import to import routes from the same package
 from . import routes
 print("Routes imported.")
 
