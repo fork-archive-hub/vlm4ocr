@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // State and Initialization
-    initializeTabSwitching();
     initializeVlmOptionHandlers();
+    initializeTabSwitching();
     initializeFilePreviewHandlers();
     let pageContentsArray = [];
     let currentOutputFormat = 'markdown';
