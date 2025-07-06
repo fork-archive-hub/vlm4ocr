@@ -15,7 +15,9 @@ Vision Language Models (VLMs) for Optical Character Recognition (OCR).
   - 📐**User Guide** is now available at [Documentation Page](https://daviden1013.github.io/vlm4ocr/)
   - **Image processing features**: added `rotate_correction` and `max_dimension_pixels` to handle misaligned scan and large images. 
   - **Optimized file staging**: added `max_file_load` parameter to `concurrent_ocr` method. 
-  
+- [v0.3.0](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.3.0) (Jun 1, 2025): 
+  - **Key information extraction with JSON**: instead of OCR the entire document, extract only the key information and output as JSON.
+  - **Batch processing to web app**: The web app now supports concurrent batch processing of multiple images using `OCREngine.concurrent_ocr` method as backend. 
 
 ## Table of Contents
 - [Overview](#overview)
@@ -29,13 +31,13 @@ Vision Language Models (VLMs) for Optical Character Recognition (OCR).
 `vlm4ocr` provides a simple way to perform OCR using the power of modern Vision Language Models (VLMs). A drag-and-drop **web application** is included for easy access. The **Python package** supports concurrent batch processing for large amount of documents. **CLI** provides lightweight access to most OCR features without the burden of coding. 
 Below are screenshots from our [Web Application](#web-application). Note that all contents shown in this README are synthesized. **There is no real personal information**.
 
-#### Markdown output mode
+#### Stream OCR resuts in real-time
 A scanned lab report with tables and highlights are converted into markdown text by our OCR engine.
 <div align="center"><img src=docs/readme_img/web_app/table_markdown_demo.PNG width=1000 ></div>
 
-#### HTML output mode
-A scanned clinical progress note with hand-writting is converted into HTML.
-<div align="center"><img src=docs/readme_img/web_app/report_HTML_demo.PNG width=1000 ></div>
+#### Batch processing many files
+Many scanned documents are batch processed and converted into markdown text by our OCR engine. 
+<div align="center"><img src=docs/readme_img/web_app/batch_processing.PNG width=1000 ></div>
 
 ## ⭐Supported Models 
 ### Open-weights (ALL Supported!!)
