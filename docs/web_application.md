@@ -1,4 +1,4 @@
-A ready-to-use web application is included. It supports input preview, real-time streaming, and output export. 
+A ready-to-use web application is included. It supports batch processing, input preview, real-time streaming, and output export. 
 
 ![type:video](./readme_img/web_app/vlm4ocr%20demo.mp4)
 
@@ -43,6 +43,11 @@ python run.py
 ```
 
 ## Usage
+#### Select single file or batch processing
+Use the tabs on the top-left corner to select either single file or batch processing.
+
+![upload_file](./readme_img/web_app/tab.PNG)
+
 #### Upload image, PDF, TIFF for OCR
 Drag-and-drop or click on the file upload area to select a file for upload. The file must be an image, PDF, or TIFF. Once uploaded, a preview will display in the *input preview* area on the right. 
 
