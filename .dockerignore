@@ -7,3 +7,4 @@ __pycache__
 *.log
 examples/
 doc_asset/
+nginx/certs/
