@@ -32,4 +32,4 @@ ENV FLASK_RUN_PORT=5000
 
 # Run app.py when the container launches using Gunicorn for production
 ENV PYTHONPATH=/app
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "300", "services.web_app.app:app"]
+CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:5000", "--timeout", "300", "services.web_app.app:app"]
