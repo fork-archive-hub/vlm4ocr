@@ -1,4 +1,9 @@
+###############################################################################
 # VLM APIs to make available in the UI
+#
+# The value must be {'openai_compatible', 'openai', 'azure_openai', 'ollama'}
+# The name is the label that will be displayed in the UI.
+###############################################################################
 vlm_api_options:
   - value: 'openai_compatible'
     name: 'OpenAI Compatible'
@@ -8,17 +13,26 @@ vlm_api_options:
     name: 'Azure OpenAI'
   - value: 'ollama'
     name: 'Ollama'
-
+###############################################################################
 # Directory for temporary file storage. Required!
+###############################################################################
 temp_directory: "services/web_app/temp"
-
+###############################################################################
 # Batch processing settings
+# 
+# "concurrent_batch_size" limits the number of files that can be processed 
+# concurrently. This is useful to avoid overwhelming the server.
+# "max_files" limits the total number of files that can be uploaded.
+###############################################################################
 batch_processing:
-  concurrent_batch_size: 2
+  concurrent_batch_size: 4
   max_files: 100
-
+###############################################################################
 # File upload settings
-# max_size_mb limits the size per request. For single file processing, this limits the file size. 
-# For batch processing, this limits the total size of all files.
+#
+# "max_size_mb" limits the size per request. For single file processing, 
+# this limits the file size. For batch processing, this limits the total size 
+# of all files.
+###############################################################################
 file_upload:
   max_size_mb: 100
