@@ -1,5 +1,6 @@
 ![Python Version](https://img.shields.io/pypi/pyversions/vlm4ocr)
 ![PyPI](https://img.shields.io/pypi/v/vlm4ocr)
+[![Website](https://img.shields.io/badge/website-GitHub.io-purple)](https://daviden1013.github.io/vlm4ocr/)
 
 Vision Language Models (VLMs) for Optical Character Recognition (OCR).
 
@@ -8,14 +9,14 @@ Vision Language Models (VLMs) for Optical Character Recognition (OCR).
 | **File Types** | :white_check_mark: PDF, TIFF, PNG, JPG/JPEG, BMP, GIF, WEBP         |
 | **VLM Engines** | :white_check_mark: Ollama, OpenAI Compatible, OpenAI, Azure OpenAI |
 | **Output Modes** | :white_check_mark: Markdown, HTML, plain text |
-| **Batch OCR** | :white_check_mark: Processes many pages concurrently by setting `concurrent_batch_size` |
+| **Batch OCR** | :white_check_mark: Processes many files concurrently with Python, CLI, and web app |
 
 ## 🆕Recent Updates
 - [v0.2.0](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.2.0) (Jun 1, 2025): 
   - 📐**User Guide** is now available at [Documentation Page](https://daviden1013.github.io/vlm4ocr/)
   - **Image processing features**: added `rotate_correction` and `max_dimension_pixels` to handle misaligned scan and large images. 
   - **Optimized file staging**: added `max_file_load` parameter to `concurrent_ocr` method. 
-- [v0.3.0](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.3.0) (Jun 1, 2025): 
+- [v0.3.0](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.3.0) (Jul 5, 2025): 
   - **Key information extraction with JSON**: instead of OCR the entire document, extract only the key information and output as JSON.
   - **Batch processing to web app**: The web app now supports concurrent batch processing of multiple images using `OCREngine.concurrent_ocr` method as backend. 
 
