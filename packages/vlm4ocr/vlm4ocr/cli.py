@@ -4,18 +4,9 @@ import sys
 import logging
 import asyncio
 import time
-
-# Attempt to import from the local package structure
-try:
-    from .ocr_engines import OCREngine
-    from .vlm_engines import OpenAIVLMEngine, AzureOpenAIVLMEngine, OllamaVLMEngine, BasicVLMConfig
-    from .data_types import OCRResult
-except ImportError:
-    # Fallback for when the package is installed
-    from vlm4ocr.ocr_engines import OCREngine
-    from vlm4ocr.vlm_engines import OpenAIVLMEngine, AzureOpenAIVLMEngine, OllamaVLMEngine, BasicVLMConfig
-    from vlm4ocr.data_types import OCRResult
-
+from .ocr_engines import OCREngine
+from .vlm_engines import OpenAICompatibleVLMEngine, OpenAIVLMEngine, AzureOpenAIVLMEngine, OllamaVLMEngine, BasicVLMConfig
+from .data_types import OCRResult
 import tqdm.asyncio
 
 # --- Global logger setup (console) ---
@@ -208,7 +199,7 @@ def main():
             vlm_engine_instance = OpenAIVLMEngine(model=args.model, api_key=args.api_key, config=config)
         elif args.vlm_engine == "openai_compatible":
             if not args.base_url: parser.error("--base_url is required for openai_compatible.")
-            vlm_engine_instance = OpenAIVLMEngine(model=args.model, api_key=args.api_key, base_url=args.base_url, config=config)
+            vlm_engine_instance = OpenAICompatibleVLMEngine(model=args.model, api_key=args.api_key, base_url=args.base_url, config=config)
         elif args.vlm_engine == "azure_openai":
             if not args.azure_api_key: parser.error("--azure_api_key (or AZURE_OPENAI_API_KEY) is required.")
             if not args.azure_endpoint: parser.error("--azure_endpoint (or AZURE_OPENAI_ENDPOINT) is required.")

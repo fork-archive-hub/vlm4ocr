@@ -126,7 +126,8 @@ class OCREngine:
                     stream=True
                 )
                 for chunk in response_stream:
-                    yield {"type": "ocr_chunk", "data": chunk}
+                    if chunk["type"] == "response":
+                        yield {"type": "ocr_chunk", "data": chunk["data"]}
 
                 if i < len(images) - 1:
                     yield {"type": "page_delimiter", "data": get_default_page_delimiter(self.output_mode)}
@@ -157,7 +158,8 @@ class OCREngine:
                     stream=True
                 )
             for chunk in response_stream:
-                yield {"type": "ocr_chunk", "data": chunk}
+                if chunk["type"] == "response":
+                    yield {"type": "ocr_chunk", "data": chunk["data"]}
             
 
     def sequential_ocr(self, file_paths: Union[str, Iterable[str]], rotate_correction:bool=False, 
@@ -276,18 +278,19 @@ class OCREngine:
                         verbose=verbose,
                         stream=False
                     )
+                    ocr_text = response["response"]
                     # Clean the response if output mode is markdown
                     if self.output_mode == "markdown":
-                        response = clean_markdown(response)
+                        ocr_text = clean_markdown(ocr_text)
 
                     # Parse the response if output mode is JSON
-                    if self.output_mode == "JSON":
-                        json_list = extract_json(response)
+                    elif self.output_mode == "JSON":
+                        json_list = extract_json(ocr_text)
                         # Serialize the JSON list to a string
-                        response = json.dumps(json_list, indent=4)
+                        ocr_text = json.dumps(json_list, indent=4)
                     
                     # Add the page to the OCR result
-                    ocr_result.add_page(text=response, 
+                    ocr_result.add_page(text=ocr_text, 
                                         image_processing_status=image_processing_status)
                 
                 except Exception as page_e:
@@ -476,15 +479,16 @@ class OCREngine:
                     }
 
             messages = self.vlm_engine.get_ocr_messages(self.system_prompt, self.user_prompt, image)
-            ocr_text = await self.vlm_engine.chat_async( 
+            response = await self.vlm_engine.chat_async( 
                 messages,
             )
+            ocr_text = response["response"]
             # Clean the OCR text if output mode is markdown
             if self.output_mode == "markdown":
                 ocr_text = clean_markdown(ocr_text)
 
             # Parse the response if output mode is JSON
-            if self.output_mode == "JSON":
+            elif self.output_mode == "JSON":
                 json_list = extract_json(ocr_text)
                 # Serialize the JSON list to a string
                 ocr_text = json.dumps(json_list, indent=4)

@@ -2,6 +2,8 @@ import abc
 import importlib.util
 from typing import Any, List, Dict, Union, Generator
 import warnings
+import os
+import re
 from PIL import Image
 from vlm4ocr.utils import image_to_base64
 
@@ -33,7 +35,7 @@ class VLMConfig(abc.ABC):
         return NotImplemented
 
     @abc.abstractmethod
-    def postprocess_response(self, response:Union[str, Generator[str, None, None]]) -> Union[str, Generator[str, None, None]]:
+    def postprocess_response(self, response:Union[str, Dict[str, str], Generator[str, None, None]]) -> Union[str, Generator[str, None, None]]:
         """
         This method postprocesses the VLM response after it is generated.
 
@@ -77,7 +79,7 @@ class BasicVLMConfig(VLMConfig):
         """
         return messages
 
-    def postprocess_response(self, response:Union[str, Generator[str, None, None]]) -> Union[str, Generator[str, None, None]]:
+    def postprocess_response(self, response:Union[str, Dict[str, str], Generator[str, None, None]]) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
         """
         This method postprocesses the VLM response after it is generated.
 
@@ -88,19 +90,121 @@ class BasicVLMConfig(VLMConfig):
         
         Returns: Union[str, Generator[Dict[str, str], None, None]]
             the postprocessed VLM response. 
-            if input is a generator, the output will be a generator {"data": <content>}.
+            if input is a generator, the output will be a generator {"type": "response", "data": <content>}.
         """
         if isinstance(response, str):
-            return response
+            return {"response": response}
+        
+        elif isinstance(response, dict):
+            if "response" in response:
+                return response
+            else:
+                warnings.warn(f"Invalid response dict keys: {response.keys()}. Returning default empty dict.", UserWarning)
+                return {"response": ""}
 
         def _process_stream():
             for chunk in response:
-                yield chunk
+                if isinstance(chunk, dict):
+                    yield chunk
+                elif isinstance(chunk, str):
+                    yield {"type": "response", "data": chunk}
 
         return _process_stream()
+    
+class ReasoningVLMConfig(VLMConfig):
+    def __init__(self, thinking_token_start="<think>", thinking_token_end="</think>", **kwargs):
+        """
+        The general configuration for reasoning vision models.
+        """
+        super().__init__(**kwargs)
+        self.thinking_token_start = thinking_token_start
+        self.thinking_token_end = thinking_token_end
+
+    def preprocess_messages(self, messages:List[Dict[str,str]]) -> List[Dict[str,str]]:
+        """
+        This method preprocesses the input messages before passing them to the VLM.
+
+        Parameters:
+        ----------
+        messages : List[Dict[str,str]]
+            a list of dict with role and content. role must be one of {"system", "user", "assistant"}
+        
+        Returns:
+        -------
+        messages : List[Dict[str,str]]
+            a list of dict with role and content. role must be one of {"system", "user", "assistant"}
+        """
+        return messages.copy()
+
+    def postprocess_response(self, response:Union[str, Dict[str, str], Generator[str, None, None]]) -> Union[Dict[str,str], Generator[Dict[str,str], None, None]]:
+        """
+        This method postprocesses the VLM response after it is generated.
+        1. If input is a string, it will extract the reasoning and response based on the thinking tokens.
+        2. If input is a dict, it should contain keys "reasoning" and "response". This is for inference engines that already parse reasoning and response.
+        3. If input is a generator, 
+            a. if the chunk is a dict, it should contain keys "type" and "data". This is for inference engines that already parse reasoning and response.
+            b. if the chunk is a string, it will yield dicts with keys "type" and "data" based on the thinking tokens.
+
+        Parameters:
+        ----------
+        response : Union[str, Generator[str, None, None]]
+            the VLM response. Can be a string or a generator.
+        
+        Returns:
+        -------
+        response : Union[str, Generator[str, None, None]]
+            the postprocessed LLM response as a dict {"reasoning": <reasoning>, "response": <content>}
+            if input is a generator, the output will be a generator {"type": <reasoning or response>, "data": <content>}.
+        """
+        if isinstance(response, str):
+            # get contents between thinking_token_start and thinking_token_end
+            pattern = f"{re.escape(self.thinking_token_start)}(.*?){re.escape(self.thinking_token_end)}"
+            match = re.search(pattern, response, re.DOTALL)
+            reasoning = match.group(1) if match else ""
+            # get response AFTER thinking_token_end
+            response = re.sub(f".*?{self.thinking_token_end}", "", response, flags=re.DOTALL).strip()
+            return {"reasoning": reasoning, "response": response}
+
+        elif isinstance(response, dict):
+            if "reasoning" in response and "response" in response:
+                return response
+            else:
+                warnings.warn(f"Invalid response dict keys: {response.keys()}. Returning default empty dict.", UserWarning)
+                return {"reasoning": "", "response": ""}
+
+        elif isinstance(response, Generator):
+            def _process_stream():
+                think_flag = False
+                buffer = ""
+                for chunk in response:
+                    if isinstance(chunk, dict):
+                        yield chunk
+
+                    elif isinstance(chunk, str):
+                        buffer += chunk
+                        # switch between reasoning and response
+                        if self.thinking_token_start in buffer:
+                            think_flag = True
+                            buffer = buffer.replace(self.thinking_token_start, "")
+                        elif self.thinking_token_end in buffer:
+                            think_flag = False
+                            buffer = buffer.replace(self.thinking_token_end, "")
+                        
+                        # if chunk is in thinking block, tag it as reasoning; else tag it as response
+                        if chunk not in [self.thinking_token_start, self.thinking_token_end]:
+                            if think_flag:
+                                yield {"type": "reasoning", "data": chunk}
+                            else:
+                                yield {"type": "response", "data": chunk}
+
+            return _process_stream()
+        
+        else:
+            warnings.warn(f"Invalid response type: {type(response)}. Returning default empty dict.", UserWarning)
+            return {"reasoning": "", "response": ""}
 
 
-class OpenAIReasoningVLMConfig(VLMConfig):
+class OpenAIReasoningVLMConfig(ReasoningVLMConfig):
     def __init__(self, reasoning_effort:str="low", **kwargs):
         """
         The OpenAI "o" series configuration.
@@ -160,28 +264,6 @@ class OpenAIReasoningVLMConfig(VLMConfig):
 
         return new_messages
 
-    def postprocess_response(self, response:Union[str, Generator[str, None, None]]) -> Union[str, Generator[Dict[str, str], None, None]]:
-        """
-        This method postprocesses the VLM response after it is generated.
-
-        Parameters:
-        ----------
-        response : Union[str, Generator[str, None, None]]
-            the VLM response. Can be a string or a generator.
-        
-        Returns: Union[str, Generator[Dict[str, str], None, None]]
-            the postprocessed VLM response. 
-            if input is a generator, the output will be a generator {"type": "response", "data": <content>}.
-        """
-        if isinstance(response, str):
-            return response
-
-        def _process_stream():
-            for chunk in response:
-                yield {"type": "response", "data": chunk}
-
-        return _process_stream()
-
 
 class VLMEngine:
     @abc.abstractmethod
@@ -198,7 +280,7 @@ class VLMEngine:
         return NotImplemented
 
     @abc.abstractmethod
-    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[str, Generator[str, None, None]]:
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
         """
         This method inputs chat messages and outputs VLM generated text.
 
@@ -214,7 +296,7 @@ class VLMEngine:
         return NotImplemented
     
     @abc.abstractmethod
-    def chat_async(self, messages:List[Dict[str,str]]) -> str:
+    def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str, str]:
         """
         The async version of chat method. Streaming is not supported.
         """
@@ -285,7 +367,7 @@ class OllamaVLMEngine(VLMEngine):
 
         return formatted_params
 
-    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[str, Generator[str, None, None]]:
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
         """
         This method inputs chat messages and outputs VLM generated text.
 
@@ -311,9 +393,15 @@ class OllamaVLMEngine(VLMEngine):
                     keep_alive=self.keep_alive
                 )
                 for chunk in response_stream:
-                    content_chunk = chunk.get('message', {}).get('content')
-                    if content_chunk:
-                        yield content_chunk
+                    if hasattr(chunk.message, 'thinking') and chunk.message.thinking:
+                        content_chunk = getattr(getattr(chunk, 'message', {}), 'thinking', '')
+                        yield {"type": "reasoning", "data": content_chunk}
+                    else:
+                        content_chunk = getattr(getattr(chunk, 'message', {}), 'content', '')
+                        yield {"type": "response", "data": content_chunk}
+
+                    if chunk.done_reason == "length":
+                        warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
 
             return self.config.postprocess_response(_stream_generator())
 
@@ -326,12 +414,29 @@ class OllamaVLMEngine(VLMEngine):
                             keep_alive=self.keep_alive
                         )
             
-            res = ''
+            res = {"reasoning": "", "response": ""}
+            phase = ""
             for chunk in response:
-                content_chunk = chunk.get('message', {}).get('content')
+                if hasattr(chunk.message, 'thinking') and chunk.message.thinking:
+                    if phase != "reasoning":
+                        print("\n--- Reasoning ---")
+                        phase = "reasoning"
+
+                    content_chunk = getattr(getattr(chunk, 'message', {}), 'thinking', '')
+                    res["reasoning"] += content_chunk
+                else:
+                    if phase != "response":
+                        print("\n--- Response ---")
+                        phase = "response"
+                    content_chunk = getattr(getattr(chunk, 'message', {}), 'content', '')
+                    res["response"] += content_chunk
+
                 print(content_chunk, end='', flush=True)
-                res += content_chunk
+
+                if chunk.done_reason == "length":
+                    warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
             print('\n')
+
             return self.config.postprocess_response(res)
         
         else:
@@ -342,11 +447,16 @@ class OllamaVLMEngine(VLMEngine):
                                 stream=False,
                                 keep_alive=self.keep_alive
                             )
-            res = response.get('message', {}).get('content')
+            res = {"reasoning": getattr(getattr(response, 'message', {}), 'thinking', ''),
+                   "response": getattr(getattr(response, 'message', {}), 'content', '')}
+        
+            if response.done_reason == "length":
+                warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+
             return self.config.postprocess_response(res)
         
 
-    async def chat_async(self, messages:List[Dict[str,str]]) -> str:
+    async def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str, str]:
         """
         Async version of chat method. Streaming is not supported.
         """
@@ -360,7 +470,11 @@ class OllamaVLMEngine(VLMEngine):
                             keep_alive=self.keep_alive
                         )
         
-        res = response['message']['content']
+        res = {"reasoning": getattr(getattr(response, 'message', {}), 'thinking', ''),
+                "response": getattr(getattr(response, 'message', {}), 'content', '')}
+        
+        if response.done_reason == "length":
+            warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
         return self.config.postprocess_response(res)
     
     def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image) -> List[Dict[str,str]]:
@@ -385,6 +499,297 @@ class OllamaVLMEngine(VLMEngine):
                 "images": [base64_str]
             }
         ]
+
+
+class OpenAICompatibleVLMEngine(VLMEngine):
+    def __init__(self, model:str, api_key:str, base_url:str, config:VLMConfig=None, **kwrs):
+        """
+        General OpenAI-compatible server inference engine.
+        https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html
+
+        For parameters and documentation, refer to https://platform.openai.com/docs/api-reference/introduction
+
+        Parameters:
+        ----------
+        model_name : str
+            model name as shown in the vLLM server
+        api_key : str
+            the API key for the vLLM server.
+        base_url : str
+            the base url for the vLLM server. 
+        config : LLMConfig
+            the LLM configuration.
+        """
+        if importlib.util.find_spec("openai") is None:
+            raise ImportError("OpenAI Python API library not found. Please install OpanAI (```pip install openai```).")
+        
+        from openai import OpenAI, AsyncOpenAI
+        from openai.types.chat import ChatCompletionChunk
+        self.ChatCompletionChunk = ChatCompletionChunk
+        super().__init__(config)
+        self.client = OpenAI(api_key=api_key, base_url=base_url, **kwrs)
+        self.async_client = AsyncOpenAI(api_key=api_key, base_url=base_url, **kwrs)
+        self.model = model
+        self.config = config if config else BasicVLMConfig()
+        self.formatted_params = self._format_config()
+
+    def _format_config(self) -> Dict[str, Any]:
+        """
+        This method format the VLM configuration with the correct key for the inference engine. 
+        """
+        formatted_params = self.config.params.copy()
+        if "max_new_tokens" in formatted_params:
+            formatted_params["max_completion_tokens"] = formatted_params["max_new_tokens"]
+            formatted_params.pop("max_new_tokens")
+
+        return formatted_params
+    
+
+    def _format_response(self, response: Any) -> Dict[str, str]:
+        """
+        This method format the response from OpenAI API to a dict with keys "type" and "data".
+
+        Parameters:
+        ----------
+        response : Any
+            the response from OpenAI-compatible API. Could be a dict, generator, or object.
+        """
+        if isinstance(response, self.ChatCompletionChunk):
+            chunk_text = getattr(response.choices[0].delta, "content", "")
+            if chunk_text is None:
+                chunk_text = ""
+            return {"type": "response", "data": chunk_text}
+
+        return {"response": getattr(response.choices[0].message, "content", "")}
+
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
+        """
+        This method inputs chat messages and outputs LLM generated text.
+
+        Parameters:
+        ----------
+        messages : List[Dict[str,str]]
+            a list of dict with role and content. role must be one of {"system", "user", "assistant"}
+        verbose : bool, Optional
+            if True, VLM generated text will be printed in terminal in real-time.
+        stream : bool, Optional
+            if True, returns a generator that yields the output in real-time.
+
+        Returns:
+        -------
+        response : Union[Dict[str,str], Generator[Dict[str, str], None, None]]
+            a dict {"reasoning": <reasoning>, "response": <response>} or Generator {"type": <reasoning or response>, "data": <content>}
+        """
+        processed_messages = self.config.preprocess_messages(messages)
+
+        if stream:
+            def _stream_generator():
+                response_stream = self.client.chat.completions.create(
+                                        model=self.model,
+                                        messages=processed_messages,
+                                        stream=True,
+                                        **self.formatted_params
+                                    )
+                for chunk in response_stream:
+                    if len(chunk.choices) > 0:
+                        chunk_dict = self._format_response(chunk)
+                        yield chunk_dict
+
+                        if chunk.choices[0].finish_reason == "length":
+                            warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+
+            return self.config.postprocess_response(_stream_generator())
+
+        elif verbose:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=processed_messages,
+                stream=True,
+                **self.formatted_params
+            )
+            res = {"reasoning": "", "response": ""}
+            phase = ""
+            for chunk in response:
+                if len(chunk.choices) > 0:
+                    chunk_dict = self._format_response(chunk)
+                    chunk_text = chunk_dict["data"]
+                    res[chunk_dict["type"]] += chunk_text
+                    if phase != chunk_dict["type"] and chunk_text != "":
+                        print(f"\n--- {chunk_dict['type'].capitalize()} ---")
+                        phase = chunk_dict["type"]
+
+                    print(chunk_text, end="", flush=True)
+                    if chunk.choices[0].finish_reason == "length":
+                        warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+
+            print('\n')
+
+        else:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=processed_messages,
+                stream=False,
+                **self.formatted_params
+            )
+            res = self._format_response(response)
+
+            if response.choices[0].finish_reason == "length":
+                warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+            
+        # Postprocess response
+        res_dict = self.config.postprocess_response(res)
+        return res_dict
+    
+
+    async def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str,str]:
+        """
+        Async version of chat method. Streaming is not supported.
+        """
+        processed_messages = self.config.preprocess_messages(messages)
+
+        response = await self.async_client.chat.completions.create(
+            model=self.model,
+            messages=processed_messages,
+            stream=False,
+            **self.formatted_params
+        )
+        
+        if response.choices[0].finish_reason == "length":
+            warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+
+        res = self._format_response(response)
+
+        # Postprocess response
+        res_dict = self.config.postprocess_response(res)
+        return res_dict
+    
+    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, format:str='png', detail:str="high") -> List[Dict[str,str]]:
+        """
+        This method inputs an image and returns the correesponding chat messages for the inference engine.
+
+        Parameters:
+        ----------
+        system_prompt : str
+            the system prompt.
+        user_prompt : str
+            the user prompt.
+        image : Image.Image
+            the image for OCR.
+        format : str, Optional
+            the image format. 
+        detail : str, Optional
+            the detail level of the image. Default is "high". 
+        """
+        base64_str = image_to_base64(image)
+        return [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/{format};base64,{base64_str}",
+                            "detail": detail
+                        },
+                    },
+                    {"type": "text", "text": user_prompt},
+                ],
+            },
+        ]
+
+
+class VLLMVLMEngine(OpenAICompatibleVLMEngine):
+    def __init__(self, model:str, api_key:str="", base_url:str="http://localhost:8000/v1", config:VLMConfig=None, **kwrs):
+        """
+        vLLM OpenAI compatible server inference engine.
+        https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html
+
+        For parameters and documentation, refer to https://platform.openai.com/docs/api-reference/introduction
+
+        Parameters:
+        ----------
+        model_name : str
+            model name as shown in the vLLM server
+        api_key : str, Optional
+            the API key for the vLLM server.
+        base_url : str, Optional
+            the base url for the vLLM server. 
+        config : LLMConfig
+            the LLM configuration.
+        """
+        super().__init__(model, api_key, base_url, config, **kwrs)
+
+
+    def _format_response(self, response: Any) -> Dict[str, str]:
+        """
+        This method format the response from OpenAI API to a dict with keys "type" and "data".
+
+        Parameters:
+        ----------
+        response : Any
+            the response from OpenAI-compatible API. Could be a dict, generator, or object.
+        """
+        if isinstance(response, self.ChatCompletionChunk):
+            if hasattr(response.choices[0].delta, "reasoning_content") and getattr(response.choices[0].delta, "reasoning_content") is not None:
+                chunk_text = getattr(response.choices[0].delta, "reasoning_content", "")
+                if chunk_text is None:
+                    chunk_text = ""
+                return {"type": "reasoning", "data": chunk_text}
+            else:
+                chunk_text = getattr(response.choices[0].delta, "content", "")
+                if chunk_text is None:
+                    chunk_text = ""
+                return {"type": "response", "data": chunk_text}
+
+        return {"reasoning": getattr(response.choices[0].message, "reasoning_content", ""),
+                "response": getattr(response.choices[0].message, "content", "")}
+        
+
+class OpenRouterVLMEngine(OpenAICompatibleVLMEngine):
+    def __init__(self, model:str, api_key:str=None, base_url:str="https://openrouter.ai/api/v1", config:VLMConfig=None, **kwrs):
+        """
+        OpenRouter OpenAI-compatible server inference engine.
+
+        Parameters:
+        ----------
+        model_name : str
+            model name as shown in the vLLM server
+        api_key : str, Optional
+            the API key for the vLLM server. If None, will use the key in os.environ['OPENROUTER_API_KEY'].
+        base_url : str, Optional
+            the base url for the vLLM server. 
+        config : LLMConfig
+            the LLM configuration.
+        """
+        self.api_key = api_key
+        if self.api_key is None:
+            self.api_key = os.getenv("OPENROUTER_API_KEY")
+        super().__init__(model, self.api_key, base_url, config, **kwrs)
+
+    def _format_response(self, response: Any) -> Dict[str, str]:
+        """
+        This method format the response from OpenAI API to a dict with keys "type" and "data".
+
+        Parameters:
+        ----------
+        response : Any
+            the response from OpenAI-compatible API. Could be a dict, generator, or object.
+        """
+        if isinstance(response, self.ChatCompletionChunk):
+            if hasattr(response.choices[0].delta, "reasoning") and getattr(response.choices[0].delta, "reasoning") is not None:
+                chunk_text = getattr(response.choices[0].delta, "reasoning", "")
+                if chunk_text is None:
+                    chunk_text = ""
+                return {"type": "reasoning", "data": chunk_text}
+            else:
+                chunk_text = getattr(response.choices[0].delta, "content", "")
+                if chunk_text is None:
+                    chunk_text = ""
+                return {"type": "response", "data": chunk_text}
+
+        return {"reasoning": getattr(response.choices[0].message, "reasoning", ""),
+                "response": getattr(response.choices[0].message, "content", "")}
 
 
 class OpenAIVLMEngine(VLMEngine):
@@ -423,7 +828,7 @@ class OpenAIVLMEngine(VLMEngine):
 
         return formatted_params
 
-    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[str, Generator[str, None, None]]:
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
         """
         This method inputs chat messages and outputs LLM generated text.
 
@@ -484,7 +889,7 @@ class OpenAIVLMEngine(VLMEngine):
             return self.config.postprocess_response(res)
     
 
-    async def chat_async(self, messages:List[Dict[str,str]]) -> str:
+    async def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str, str]:
         """
         Async version of chat method. Streaming is not supported.
         """
