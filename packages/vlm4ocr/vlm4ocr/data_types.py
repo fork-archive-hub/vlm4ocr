@@ -1,5 +1,5 @@
 import os
-from typing import List, Literal
+from typing import List, Dict, Literal
 from dataclasses import dataclass, field
 from vlm4ocr.utils import get_default_page_delimiter
 
@@ -24,6 +24,7 @@ class OCRResult:
     pages: List[dict] = field(default_factory=list)
     filename: str = field(init=False)
     status: str = field(init=False, default="processing")
+    messages_log: List[List[Dict[str,str]]] = field(default_factory=list)
 
     def __post_init__(self):
         """
@@ -67,10 +68,6 @@ class OCRResult:
         }
         self.pages.append(page)
 
-
-    def __len__(self):
-        return len(self.pages)
-
     def get_page(self, idx):
         if not isinstance(idx, int):
             raise ValueError("Index must be an integer")
@@ -78,6 +75,21 @@ class OCRResult:
             raise IndexError(f"Index out of range. The OCRResult has {len(self.pages)} pages, but index {idx} was requested.")
         
         return self.pages[idx]
+
+    def clear_messages_log(self):
+        self.messages_log = []
+
+    def add_messages_to_log(self, messages: List[Dict[str,str]]):
+        if not isinstance(messages, list):
+            raise ValueError("messages must be a list of dict")
+        
+        self.messages_log.extend(messages)
+
+    def get_messages_log(self) -> List[List[Dict[str,str]]]:
+        return self.messages_log.copy()
+
+    def __len__(self):
+        return len(self.pages)
     
     def __iter__(self):
         return iter(self.pages)
