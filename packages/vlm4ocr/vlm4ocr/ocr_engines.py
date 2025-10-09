@@ -6,7 +6,7 @@ from colorama import Fore, Style
 import json
 from vlm4ocr.utils import DataLoader, PDFDataLoader, TIFFDataLoader, ImageDataLoader, ImageProcessor, clean_markdown, extract_json, get_default_page_delimiter
 from vlm4ocr.data_types import OCRResult
-from vlm4ocr.vlm_engines import VLMEngine
+from vlm4ocr.vlm_engines import VLMEngine, MessagesLogger
 
 SUPPORTED_IMAGE_EXTS = ['.pdf', '.tif', '.tiff', '.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp']
 
@@ -273,10 +273,14 @@ class OCREngine:
 
                 try:
                     messages = self.vlm_engine.get_ocr_messages(self.system_prompt, self.user_prompt, image)
+                    # Define a messages logger to capture messages
+                    messages_logger = MessagesLogger()
+                    # Generate response
                     response = self.vlm_engine.chat(
                         messages,
                         verbose=verbose,
-                        stream=False
+                        stream=False,
+                        messages_logger=messages_logger
                     )
                     ocr_text = response["response"]
                     # Clean the response if output mode is markdown
@@ -292,6 +296,9 @@ class OCREngine:
                     # Add the page to the OCR result
                     ocr_result.add_page(text=ocr_text, 
                                         image_processing_status=image_processing_status)
+                    
+                    # Add messages log to the OCR result
+                    ocr_result.add_messages_to_log(messages_logger.get_messages_log())
                 
                 except Exception as page_e:
                     ocr_result.status = "error"
@@ -390,6 +397,7 @@ class OCREngine:
             filename = os.path.basename(file_path)
             file_ext = os.path.splitext(file_path)[1].lower()
             result = OCRResult(input_dir=file_path, output_mode=self.output_mode)
+            messages_logger = MessagesLogger()
             # check file extension
             if file_ext not in SUPPORTED_IMAGE_EXTS:
                 result.status = "error"
@@ -419,7 +427,8 @@ class OCREngine:
                         data_loader=data_loader,
                         page_index=page_index,
                         rotate_correction=rotate_correction,
-                        max_dimension_pixels=max_dimension_pixels
+                        max_dimension_pixels=max_dimension_pixels,
+                        messages_logger=messages_logger
                     )
                     page_processing_tasks.append(task)
                 
@@ -431,14 +440,17 @@ class OCREngine:
             except Exception as e:
                 result.status = "error"
                 result.add_page(text=f"Error during OCR for {filename}: {str(e)}", image_processing_status={})
+                result.add_messages_to_log(messages_logger.get_messages_log())
                 return result
 
         # Set status to success if no errors occurred
         result.status = "success"
+        result.add_messages_to_log(messages_logger.get_messages_log())
         return result
 
     async def _ocr_page_with_semaphore(self, vlm_call_semaphore: asyncio.Semaphore, data_loader: DataLoader,
-                                       page_index:int, rotate_correction:bool=False, max_dimension_pixels:int=None) -> Tuple[str, Dict[str, str]]:
+                                       page_index:int, rotate_correction:bool=False, max_dimension_pixels:int=None,
+                                       messages_logger:MessagesLogger=None) -> Tuple[str, Dict[str, str]]:
         """
         This internal method takes a semaphore and OCR a single image/page using the VLM inference engine.
 
@@ -481,6 +493,7 @@ class OCREngine:
             messages = self.vlm_engine.get_ocr_messages(self.system_prompt, self.user_prompt, image)
             response = await self.vlm_engine.chat_async( 
                 messages,
+                messages_logger=messages_logger
             )
             ocr_text = response["response"]
             # Clean the OCR text if output mode is markdown

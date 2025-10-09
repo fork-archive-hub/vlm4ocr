@@ -265,6 +265,32 @@ class OpenAIReasoningVLMConfig(ReasoningVLMConfig):
         return new_messages
 
 
+class MessagesLogger:
+    def __init__(self):
+        """
+        This class is used to log the messages for InferenceEngine.chat().
+        """
+        self.messages_log = []
+
+    def log_messages(self, messages : List[Dict[str,str]]):
+        """
+        This method logs the messages to a list.
+        """
+        self.messages_log.append(messages)
+
+    def get_messages_log(self) -> List[List[Dict[str,str]]]:
+        """
+        This method returns a copy of the current messages log
+        """
+        return self.messages_log.copy()
+    
+    def clear_messages_log(self):
+        """
+        This method clears the current messages log
+        """
+        self.messages_log.clear()
+
+
 class VLMEngine:
     @abc.abstractmethod
     def __init__(self, config:VLMConfig, **kwrs):
@@ -280,7 +306,8 @@ class VLMEngine:
         return NotImplemented
 
     @abc.abstractmethod
-    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False, 
+             messages_logger:MessagesLogger=None) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
         """
         This method inputs chat messages and outputs VLM generated text.
 
@@ -292,11 +319,13 @@ class VLMEngine:
             if True, VLM generated text will be printed in terminal in real-time.
         stream : bool, Optional
             if True, returns a generator that yields the output in real-time.
+        Messages_logger : MessagesLogger, Optional
+            the message logger that logs the chat messages.
         """
         return NotImplemented
     
     @abc.abstractmethod
-    def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str, str]:
+    def chat_async(self, messages:List[Dict[str,str]], messages_logger:MessagesLogger=None) -> Dict[str, str]:
         """
         The async version of chat method. Streaming is not supported.
         """
@@ -367,7 +396,8 @@ class OllamaVLMEngine(VLMEngine):
 
         return formatted_params
 
-    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False, 
+             messages_logger:MessagesLogger=None) -> Union[Dict[str,str], Generator[Dict[str, str], None, None]]:
         """
         This method inputs chat messages and outputs VLM generated text.
 
@@ -379,6 +409,13 @@ class OllamaVLMEngine(VLMEngine):
             if True, VLM generated text will be printed in terminal in real-time.
         stream : bool, Optional
             if True, returns a generator that yields the output in real-time.
+        Messages_logger : MessagesLogger, Optional
+            the message logger that logs the chat messages.
+
+        Returns:
+        -------
+        response : Union[Dict[str,str], Generator[Dict[str, str], None, None]]
+            a dict {"reasoning": <reasoning>, "response": <response>} or Generator {"type": <reasoning or response>, "data": <content>}
         """
         processed_messages = self.config.preprocess_messages(messages)
 
@@ -392,16 +429,33 @@ class OllamaVLMEngine(VLMEngine):
                     stream=True, 
                     keep_alive=self.keep_alive
                 )
+                res = {"reasoning": "", "response": ""}
                 for chunk in response_stream:
                     if hasattr(chunk.message, 'thinking') and chunk.message.thinking:
                         content_chunk = getattr(getattr(chunk, 'message', {}), 'thinking', '')
+                        res["reasoning"] += content_chunk
                         yield {"type": "reasoning", "data": content_chunk}
                     else:
                         content_chunk = getattr(getattr(chunk, 'message', {}), 'content', '')
+                        res["response"] += content_chunk
                         yield {"type": "response", "data": content_chunk}
 
                     if chunk.done_reason == "length":
                         warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+                
+                # Postprocess response
+                res_dict = self.config.postprocess_response(res)
+                # Write to messages log
+                if messages_logger:
+                    # replace images content with a placeholder "[image]" to save space
+                    for messages in processed_messages:
+                        if "images" in messages:
+                            messages["images"] = ["[image]" for _ in messages["images"]]
+
+                    processed_messages.append({"role": "assistant",
+                                                "content": res_dict.get("response", ""),
+                                                "reasoning": res_dict.get("reasoning", "")})
+                    messages_logger.log_messages(processed_messages)
 
             return self.config.postprocess_response(_stream_generator())
 
@@ -437,8 +491,6 @@ class OllamaVLMEngine(VLMEngine):
                     warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
             print('\n')
 
-            return self.config.postprocess_response(res)
-        
         else:
             response = self.client.chat(
                                 model=self.model_name, 
@@ -453,10 +505,24 @@ class OllamaVLMEngine(VLMEngine):
             if response.done_reason == "length":
                 warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
 
-            return self.config.postprocess_response(res)
+        # Postprocess response
+        res_dict = self.config.postprocess_response(res)
+        # Write to messages log
+        if messages_logger:
+            # replace images content with a placeholder "[image]" to save space
+            for messages in processed_messages:
+                if "images" in messages:
+                    messages["images"] = ["[image]" for _ in messages["images"]]
+
+            processed_messages.append({"role": "assistant", 
+                                    "content": res_dict.get("response", ""), 
+                                    "reasoning": res_dict.get("reasoning", "")})
+            messages_logger.log_messages(processed_messages)
+
+        return res_dict
         
 
-    async def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str, str]:
+    async def chat_async(self, messages:List[Dict[str,str]], messages_logger:MessagesLogger=None) -> Dict[str,str]:
         """
         Async version of chat method. Streaming is not supported.
         """
@@ -471,11 +537,25 @@ class OllamaVLMEngine(VLMEngine):
                         )
         
         res = {"reasoning": getattr(getattr(response, 'message', {}), 'thinking', ''),
-                "response": getattr(getattr(response, 'message', {}), 'content', '')}
+               "response": getattr(getattr(response, 'message', {}), 'content', '')}
         
         if response.done_reason == "length":
             warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
-        return self.config.postprocess_response(res)
+        # Postprocess response
+        res_dict = self.config.postprocess_response(res)
+        # Write to messages log
+        if messages_logger:
+            # replace images content with a placeholder "[image]" to save space
+            for messages in processed_messages:
+                if "images" in messages:
+                    messages["images"] = ["[image]" for _ in messages["images"]]
+
+            processed_messages.append({"role": "assistant", 
+                                        "content": res_dict.get("response", ""), 
+                                        "reasoning": res_dict.get("reasoning", "")})
+            messages_logger.log_messages(processed_messages)
+
+        return res_dict
     
     def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image) -> List[Dict[str,str]]:
         """
@@ -562,7 +642,8 @@ class OpenAICompatibleVLMEngine(VLMEngine):
 
         return {"response": getattr(response.choices[0].message, "content", "")}
 
-    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False, 
+             messages_logger:MessagesLogger=None) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
         """
         This method inputs chat messages and outputs LLM generated text.
 
@@ -574,6 +655,8 @@ class OpenAICompatibleVLMEngine(VLMEngine):
             if True, VLM generated text will be printed in terminal in real-time.
         stream : bool, Optional
             if True, returns a generator that yields the output in real-time.
+        messages_logger : MessagesLogger, Optional
+            the message logger that logs the chat messages.
 
         Returns:
         -------
@@ -590,13 +673,31 @@ class OpenAICompatibleVLMEngine(VLMEngine):
                                         stream=True,
                                         **self.formatted_params
                                     )
+                res_text = ""
                 for chunk in response_stream:
                     if len(chunk.choices) > 0:
                         chunk_dict = self._format_response(chunk)
                         yield chunk_dict
 
+                        res_text += chunk_dict["data"]
                         if chunk.choices[0].finish_reason == "length":
                             warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+
+                # Postprocess response
+                res_dict = self.config.postprocess_response(res_text)
+                # Write to messages log
+                if messages_logger:
+                    # replace images content with a placeholder "[image]" to save space
+                    for messages in processed_messages:
+                        if "content" in messages and isinstance(messages["content"], list):
+                            for content in messages["content"]:
+                                if isinstance(content, dict) and content.get("type") == "image_url":
+                                    content["image_url"]["url"] = "[image]"
+
+                    processed_messages.append({"role": "assistant",
+                                                "content": res_dict.get("response", ""),
+                                                "reasoning": res_dict.get("reasoning", "")})
+                    messages_logger.log_messages(processed_messages)
 
             return self.config.postprocess_response(_stream_generator())
 
@@ -638,10 +739,24 @@ class OpenAICompatibleVLMEngine(VLMEngine):
             
         # Postprocess response
         res_dict = self.config.postprocess_response(res)
+        # Write to messages log
+        if messages_logger:
+            # replace images content with a placeholder "[image]" to save space
+            for messages in processed_messages:
+                if "content" in messages and isinstance(messages["content"], list):
+                    for content in messages["content"]:
+                        if isinstance(content, dict) and content.get("type") == "image_url":
+                            content["image_url"]["url"] = "[image]"
+
+            processed_messages.append({"role": "assistant", 
+                                    "content": res_dict.get("response", ""), 
+                                    "reasoning": res_dict.get("reasoning", "")})
+            messages_logger.log_messages(processed_messages)
+
         return res_dict
     
 
-    async def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str,str]:
+    async def chat_async(self, messages:List[Dict[str,str]], messages_logger:MessagesLogger=None) -> Dict[str,str]:
         """
         Async version of chat method. Streaming is not supported.
         """
@@ -661,6 +776,20 @@ class OpenAICompatibleVLMEngine(VLMEngine):
 
         # Postprocess response
         res_dict = self.config.postprocess_response(res)
+        # Write to messages log
+        if messages_logger:
+            # replace images content with a placeholder "[image]" to save space
+            for messages in processed_messages:
+                if "content" in messages and isinstance(messages["content"], list):
+                    for content in messages["content"]:
+                        if isinstance(content, dict) and content.get("type") == "image_url":
+                            content["image_url"]["url"] = "[image]"
+
+            processed_messages.append({"role": "assistant", 
+                                        "content": res_dict.get("response", ""), 
+                                        "reasoning": res_dict.get("reasoning", "")})
+            messages_logger.log_messages(processed_messages)
+
         return res_dict
     
     def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, format:str='png', detail:str="high") -> List[Dict[str,str]]:
@@ -828,7 +957,7 @@ class OpenAIVLMEngine(VLMEngine):
 
         return formatted_params
 
-    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
+    def chat(self, messages:List[Dict[str,str]], verbose:bool=False, stream:bool=False, messages_logger:MessagesLogger=None) -> Union[Dict[str, str], Generator[Dict[str, str], None, None]]:
         """
         This method inputs chat messages and outputs LLM generated text.
 
@@ -840,6 +969,13 @@ class OpenAIVLMEngine(VLMEngine):
             if True, VLM generated text will be printed in terminal in real-time.
         stream : bool, Optional
             if True, returns a generator that yields the output in real-time.
+        messages_logger : MessagesLogger, Optional
+            the message logger that logs the chat messages.
+
+        Returns:
+        -------
+        response : Union[Dict[str,str], Generator[Dict[str, str], None, None]]
+            a dict {"reasoning": <reasoning>, "response": <response>} or Generator {"type": <reasoning or response>, "data": <content>}
         """
         processed_messages = self.config.preprocess_messages(messages)
 
@@ -851,12 +987,31 @@ class OpenAIVLMEngine(VLMEngine):
                                         stream=True,
                                         **self.formatted_params
                                     )
+                res_text = ""
                 for chunk in response_stream:
                     if len(chunk.choices) > 0:
-                        if chunk.choices[0].delta.content is not None:
-                            yield chunk.choices[0].delta.content
+                        chunk_text = chunk.choices[0].delta.content
+                        if chunk_text is not None:
+                            res_text += chunk_text
+                            yield chunk_text
                         if chunk.choices[0].finish_reason == "length":
                             warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
+
+                # Postprocess response
+                res_dict = self.config.postprocess_response(res_text)
+                # Write to messages log
+                if messages_logger:
+                    # replace images content with a placeholder "[image]" to save space
+                    for messages in processed_messages:
+                        if "content" in messages and isinstance(messages["content"], list):
+                            for content in messages["content"]:
+                                if isinstance(content, dict) and content.get("type") == "image_url":
+                                    content["image_url"]["url"] = "[image]"
+
+                    processed_messages.append({"role": "assistant",
+                                                "content": res_dict.get("response", ""),
+                                                "reasoning": res_dict.get("reasoning", "")})
+                    messages_logger.log_messages(processed_messages)
 
             return self.config.postprocess_response(_stream_generator())
 
@@ -877,7 +1032,7 @@ class OpenAIVLMEngine(VLMEngine):
                         warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
 
             print('\n')
-            return self.config.postprocess_response(res)
+
         else:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -886,10 +1041,27 @@ class OpenAIVLMEngine(VLMEngine):
                 **self.formatted_params
             )
             res = response.choices[0].message.content
-            return self.config.postprocess_response(res)
+            
+        # Postprocess response
+        res_dict = self.config.postprocess_response(res)
+        # Write to messages log
+        if messages_logger:
+            # replace images content with a placeholder "[image]" to save space
+            for messages in processed_messages:
+                if "content" in messages and isinstance(messages["content"], list):
+                    for content in messages["content"]:
+                        if isinstance(content, dict) and content.get("type") == "image_url":
+                            content["image_url"]["url"] = "[image]"
+
+            processed_messages.append({"role": "assistant", 
+                                    "content": res_dict.get("response", ""), 
+                                    "reasoning": res_dict.get("reasoning", "")})
+            messages_logger.log_messages(processed_messages)
+
+        return res_dict
     
 
-    async def chat_async(self, messages:List[Dict[str,str]]) -> Dict[str, str]:
+    async def chat_async(self, messages:List[Dict[str,str]], messages_logger:MessagesLogger=None) -> Dict[str,str]:
         """
         Async version of chat method. Streaming is not supported.
         """
@@ -906,7 +1078,23 @@ class OpenAIVLMEngine(VLMEngine):
             warnings.warn("Model stopped generating due to context length limit.", RuntimeWarning)
 
         res = response.choices[0].message.content
-        return self.config.postprocess_response(res)
+        # Postprocess response
+        res_dict = self.config.postprocess_response(res)
+        # Write to messages log
+        if messages_logger:
+            # replace images content with a placeholder "[image]" to save space
+            for messages in processed_messages:
+                if "content" in messages and isinstance(messages["content"], list):
+                    for content in messages["content"]:
+                        if isinstance(content, dict) and content.get("type") == "image_url":
+                            content["image_url"]["url"] = "[image]"
+                            
+            processed_messages.append({"role": "assistant", 
+                                    "content": res_dict.get("response", ""), 
+                                    "reasoning": res_dict.get("reasoning", "")})
+            messages_logger.log_messages(processed_messages)
+
+        return res_dict
     
     def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, format:str='png', detail:str="high") -> List[Dict[str,str]]:
         """
