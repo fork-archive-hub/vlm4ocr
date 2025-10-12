@@ -116,6 +116,13 @@
                                 <label for="temperature">Temperature:</label>
                                 <input type="number" id="temperature" name="temperature" value="0.0" min="0" max="2" step="0.1" class="api-input">
                             </div>
+                            <div class="form-group">
+                                <label for="vlm-config-select">VLM Configuration:</label>
+                                <select id="vlm-config-select" name="vlm_config" required>
+                                    <option value="basic" selected>Basic VLM</option>
+                                    <option value="reasoning">Reasoning VLM</option>
+                                </select>
+                            </div>
                         </div>
                     </details>
                     <button type="submit" id="run-ocr-button">Run OCR</button>
@@ -253,6 +260,13 @@
                                 <label for="batch-temperature">Temperature:</label>
                                 <input type="number" id="batch-temperature" name="temperature" value="0.0" min="0" max="2" step="0.1" class="api-input">
                             </div>
+                            <div class="form-group">
+                                <label for="batch-vlm-config-select">VLM Configuration:</label>
+                                <select id="batch-vlm-config-select" name="vlm_config" required>
+                                    <option value="basic" selected>Basic VLM</option>
+                                    <option value="reasoning">Reasoning VLM</option>
+                                </select>
+                            </div>
                         </div>
                     </details>
                     <button type="submit" id="run-batch-ocr-button">Run Batch OCR</button>
@@ -279,8 +293,5 @@
             </div>
         </div>
     </div>
-    <!-- End of Batch Processing Tab Pane -->
-
-</div>
-<!-- End of Tab Content -->
+    </div>
 {% endblock %}

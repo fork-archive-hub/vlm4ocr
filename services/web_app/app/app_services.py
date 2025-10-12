@@ -17,7 +17,7 @@ from . import cleanup_file
 
 try:
     from vlm4ocr.ocr_engines import OCREngine
-    from vlm4ocr.vlm_engines import OpenAIVLMEngine, AzureOpenAIVLMEngine, OllamaVLMEngine, BasicVLMConfig
+    from vlm4ocr.vlm_engines import OpenAIVLMEngine, AzureOpenAIVLMEngine, OllamaVLMEngine, BasicVLMConfig, ReasoningVLMConfig
 except ImportError as e:
     print(f"Error importing from vlm4ocr in app_services.py: {e}")
     raise
@@ -31,6 +31,8 @@ def _initialize_ocr_engine(form_data):
     vlm_api = form_data.get('vlm_api', '')
     user_prompt = form_data.get('user_prompt', None)
     output_format = form_data.get('output_format', 'markdown')
+    vlm_config_type = form_data.get('vlm_config', 'basic')
+
     try:
         max_new_tokens = int(form_data.get('max_new_tokens', '4096'))
         temperature = float(form_data.get('temperature', '0.0'))
@@ -38,7 +40,13 @@ def _initialize_ocr_engine(form_data):
         raise ValueError("Invalid value for Max New Tokens or Temperature.")
 
     print(f"Initializing VLM Engine for API: {vlm_api}")
-    config = BasicVLMConfig(max_new_tokens=max_new_tokens, temperature=temperature)
+    
+    if vlm_config_type == 'reasoning':
+        print("Using ReasoningVLMConfig")
+        config = ReasoningVLMConfig(max_new_tokens=max_new_tokens, temperature=temperature)
+    else:
+        print("Using BasicVLMConfig")
+        config = BasicVLMConfig(max_new_tokens=max_new_tokens, temperature=temperature)
 
     vlm_engine = None
     if vlm_api == "openai_compatible":
