@@ -153,6 +153,18 @@
       
     
     
+      <div class="md-header__source">
+        <a href="https://github.com/daviden1013/vlm4ocr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    daviden1013/vlm4ocr
+  </div>
+</a>
+      </div>
+    
   </nav>
   
 </header>
@@ -186,6 +198,18 @@
     </a>
     VLM4OCR Documentation
   </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/daviden1013/vlm4ocr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    daviden1013/vlm4ocr
+  </div>
+</a>
+    </div>
   
   <ul class="md-nav__list" data-md-scrollfix>
     
@@ -386,6 +410,30 @@
       Locally hosted vLLM server
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Locally hosted vLLM server">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-vl-30b-a3b-instruct" class="md-nav__link">
+    <span class="md-ellipsis">
+      Qwen3-VL-30B-A3B-Instruct
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-vl-30b-a3b-thinking" class="md-nav__link">
+    <span class="md-ellipsis">
+      Qwen3-VL-30B-A3B-Thinking
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -624,6 +672,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Locally hosted vLLM server">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-vl-30b-a3b-instruct" class="md-nav__link">
+    <span class="md-ellipsis">
+      Qwen3-VL-30B-A3B-Instruct
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-vl-30b-a3b-thinking" class="md-nav__link">
+    <span class="md-ellipsis">
+      Qwen3-VL-30B-A3B-Thinking
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -682,86 +754,94 @@
                   
 
 
+  
+  
+
 
   <h1>VLM Engines</h1>
 
-<div><p>The <code>VLMEngine</code> class is responsible for configuring VLM for OCR. Children of this abstract class implements <code>chat</code> and <code>chat_async</code> methods for prompting VLMs with input messages. It also has <code>get_ocr_messages</code> method that unifies messages template for image input. Below are the built-in VLMEngines. Use <code>BasicVLMConfig</code> to set sampling parameters. For OpenAI reasoning models ("o" series), use <code>OpenAIReasoningVLMConfig</code> to automatically handle system prompt. </p>
+<div><p>The <code>VLMEngine</code> class is responsible for configuring VLM for OCR. Children of this abstract class implements <code>chat</code> and <code>chat_async</code> methods for prompting VLMs with input messages. It also has <code>get_ocr_messages</code> method that unifies messages template for image input. Below are the built-in VLMEngines. Use <code>BasicVLMConfig</code> to set sampling parameters. For reasoning models, use <code>ReasoningVLMConfig</code> to handle reasoning tokens. For OpenAI reasoning models ("o" series), use <code>OpenAIReasoningVLMConfig</code> to automatically handle system prompt and reasoning tokens. </p>
 <h3 id="openai-compatible">OpenAI Compatible</h3>
-<p>The OpenAI compatible VLM engine works with a wide variety of VLM inferencing services:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">OpenAIVLMEngine</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"&lt;mode_name&gt;"</span><span class="p">,</span> <span class="n">base_url</span><span class="o">=</span><span class="s2">"&lt;base_url&gt;"</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">"&lt;api_key&gt;"</span><span class="p">)</span>
-</code></pre></div>
+<p>The OpenAI compatible VLM engine works with a wide variety of VLM inferencing services. In general, the parent class <code>OpenAICompatibleVLMEngine</code> can be used to create custom engines for services that follow the OpenAI chat-completion API format. Below are some built-in engines that inherit from <code>OpenAICompatibleVLMEngine</code>.</p>
 <h4 id="locally-hosted-vllm-server">Locally hosted vLLM server</h4>
 <p>Inference engines like <a href="https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html">vLLM OpenAI compatible server</a> is supported. To start a server:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen2.5-VL-7B-Instruct<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--api-key<span class="w"> </span>EMPTY<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>--dtype<span class="w"> </span>bfloat16<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span>--max-model-len<span class="w"> </span><span class="m">16000</span><span class="w"> </span><span class="se">\ </span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span>--limit-mm-per-prompt<span class="w"> </span><span class="nv">image</span><span class="o">=</span><span class="m">1</span>,video<span class="o">=</span><span class="m">0</span>
+<h5 id="qwen3-vl-30b-a3b-instruct">Qwen3-VL-30B-A3B-Instruct</h5>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen3-VL-30B-A3B-Instruct<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--max-model-len<span class="w"> </span><span class="m">16000</span><span class="w"> </span><span class="se">\ </span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>--limit-mm-per-prompt<span class="w"> </span><span class="s1">'{"images": 1, "videos": 0}'</span>
 </code></pre></div>
 <p>Define a VLM engine to work with the vLLM server. </p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-VL-7B-Instruct"</span><span class="p">,</span> 
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                             <span class="n">base_url</span><span class="o">=</span><span class="s2">"http://localhost:8000/v1"</span><span class="p">,</span> 
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                             <span class="n">api_key</span><span class="o">=</span><span class="s2">"EMPTY"</span><span class="p">,</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                             <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>    
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                            <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">VLLMVLMEngine</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">VLLMVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen3-VL-30B-A3B-Instruct"</span><span class="p">,</span> 
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                           <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_new_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>    
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                          <span class="p">)</span>
+</code></pre></div>
+<h5 id="qwen3-vl-30b-a3b-thinking">Qwen3-VL-30B-A3B-Thinking</h5>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen3-VL-30B-A3B-Thinking<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>--max-model-len<span class="w"> </span><span class="m">64000</span><span class="w"> </span><span class="se">\ </span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>--limit-mm-per-prompt<span class="w"> </span><span class="s1">'{"images": 1, "videos": 0}'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>--reasoning-parser<span class="w"> </span>deepseek-r1
+</code></pre></div>
+<p>Define a VLM engine to work with the vLLM server. </p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">ReasoningVLMConfig</span><span class="p">,</span> <span class="n">VLLMVLMEngine</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">VLLMVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen3-VL-30B-A3B-Thinking"</span><span class="p">,</span> 
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>                           <span class="n">config</span><span class="o">=</span><span class="n">ReasoningVLMConfig</span><span class="p">(</span><span class="n">temperature</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">top_p</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span> <span class="n">max_new_tokens</span><span class="o">=</span><span class="mi">8192</span><span class="p">)</span>    
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>                          <span class="p">)</span>
 </code></pre></div>
 <h4 id="vlm-inference-with-api-servers">VLM inference with API servers</h4>
 <p>Remote VLM inference servers are supported. We use OpenRouter as an example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-VL-7B-Instruct"</span><span class="p">,</span> 
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>                             <span class="n">base_url</span><span class="o">=</span><span class="s2">"https://openrouter.ai/api/v1"</span><span class="p">,</span> 
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>                             <span class="n">api_key</span><span class="o">=</span><span class="s2">"&lt;OPENROUTER_API_KEY&gt;"</span><span class="p">,</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>                             <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>                            <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">OpenRouterVLMEngine</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenRouterVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-VL-7B-Instruct"</span><span class="p">,</span> 
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>                                 <span class="n">api_key</span><span class="o">=</span><span class="s2">"&lt;OPENROUTER_API_KEY&gt;"</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>                                 <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>                                <span class="p">)</span>
 </code></pre></div>
 <h3 id="ollama">Ollama</h3>
 <p>Ollama to run VLM inference:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">OllamaVLMEngine</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OllamaVLMEngine</span><span class="p">(</span><span class="n">model_name</span><span class="o">=</span><span class="s2">"llama3.2-vision:11b-instruct-fp16"</span><span class="p">,</span> 
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>                             <span class="n">num_ctx</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> 
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>                             <span class="n">keep_alive</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>                             <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>                            <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">OllamaVLMEngine</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OllamaVLMEngine</span><span class="p">(</span><span class="n">model_name</span><span class="o">=</span><span class="s2">"llama3.2-vision:11b-instruct-fp16"</span><span class="p">,</span> 
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>                             <span class="n">num_ctx</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> 
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>                             <span class="n">keep_alive</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>                             <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>                            <span class="p">)</span>
 </code></pre></div>
 <h3 id="openai-api">OpenAI API</h3>
 <p>Follow the <a href="https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety">Best Practices for API Key Safety</a> to set up API key.</p>
-<p></p><div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>&lt;your_API_key&gt;
+<p></p><div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>&lt;your_API_key&gt;
 </code></pre></div>
 For non-reasoning models (e.g., <em>gpt-4o-mini</em>), use <code>BasicVLMConfig</code> to set sampling parameters.
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"gpt-4o-mini"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span> <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">BasicVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"gpt-4o-mini"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span> <span class="p">)</span>
 </code></pre></div>
 <p>For reasoning models (e.g., <em>o3-mini</em>), use <code>OpenAIReasoningVLMConfig</code> to set reasoning effort.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">OpenAIReasoningVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"o3-mini"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">OpenAIReasoningVLMConfig</span><span class="p">(</span><span class="n">reasoning_effort</span><span class="o">=</span><span class="s2">"low"</span><span class="p">)</span> <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">OpenAIReasoningVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">OpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"o3-mini"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">OpenAIReasoningVLMConfig</span><span class="p">(</span><span class="n">reasoning_effort</span><span class="o">=</span><span class="s2">"low"</span><span class="p">)</span> <span class="p">)</span>
 </code></pre></div>
 <h3 id="azure-openai-api">Azure OpenAI API</h3>
 <p>Follow the <a href="https://learn.microsoft.com/en-us/azure/ai-services/openai/quickstart?tabs=command-line%2Ckeyless%2Ctypescript-keyless%2Cpython-new&amp;pivots=programming-language-python">Azure AI Services Quickstart</a> to set up Endpoint and API key.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AZURE_OPENAI_API_KEY</span><span class="o">=</span><span class="s2">"&lt;your_API_key&gt;"</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AZURE_OPENAI_ENDPOINT</span><span class="o">=</span><span class="s2">"&lt;your_endpoint&gt;"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AZURE_OPENAI_API_KEY</span><span class="o">=</span><span class="s2">"&lt;your_API_key&gt;"</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AZURE_OPENAI_ENDPOINT</span><span class="o">=</span><span class="s2">"&lt;your_endpoint&gt;"</span>
 </code></pre></div>
 <p>For non-reasoning models (e.g., <em>gpt-4o-mini</em>), use <code>BasicVLMConfig</code> to set sampling parameters.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span> <span class="nn">llm_ie.engines</span> <span class="kn">import</span> <span class="n">AzureOpenAIVLMEngine</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">AzureOpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"gpt-4o-mini"</span><span class="p">,</span> 
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>                                  <span class="n">api_version</span><span class="o">=</span><span class="s2">"&lt;your api version&gt;"</span><span class="p">,</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>                                  <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>                                <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span> <span class="nn">llm_ie.engines</span> <span class="kn">import</span> <span class="n">AzureOpenAIVLMEngine</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">AzureOpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"gpt-4o-mini"</span><span class="p">,</span> 
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>                                  <span class="n">api_version</span><span class="o">=</span><span class="s2">"&lt;your api version&gt;"</span><span class="p">,</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>                                  <span class="n">config</span><span class="o">=</span><span class="n">BasicVLMConfig</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>                                <span class="p">)</span>
 </code></pre></div>
 <p>For reasoning models (e.g., <em>o3-mini</em>), use <code>OpenAIReasoningVLMConfig</code> to set reasoning effort.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">OpenAIReasoningVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">AzureOpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"o3-mini"</span><span class="p">,</span> 
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>                                  <span class="n">api_version</span><span class="o">=</span><span class="s2">"&lt;your api version&gt;"</span><span class="p">,</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>                                  <span class="n">config</span><span class="o">=</span><span class="n">OpenAIReasoningVLMConfig</span><span class="p">(</span><span class="n">reasoning_effort</span><span class="o">=</span><span class="s2">"low"</span><span class="p">)</span> <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">OpenAIReasoningVLMConfig</span><span class="p">,</span> <span class="n">OpenAIVLMEngine</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">vlm_engine</span> <span class="o">=</span> <span class="n">AzureOpenAIVLMEngine</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"o3-mini"</span><span class="p">,</span> 
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>                                  <span class="n">api_version</span><span class="o">=</span><span class="s2">"&lt;your api version&gt;"</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>                                  <span class="n">config</span><span class="o">=</span><span class="n">OpenAIReasoningVLMConfig</span><span class="p">(</span><span class="n">reasoning_effort</span><span class="o">=</span><span class="s2">"low"</span><span class="p">)</span> <span class="p">)</span>
 </code></pre></div></div>
 
 
