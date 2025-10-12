@@ -1,48 +1,56 @@
-The `VLMEngine` class is responsible for configuring VLM for OCR. Children of this abstract class implements `chat` and `chat_async` methods for prompting VLMs with input messages. It also has `get_ocr_messages` method that unifies messages template for image input. Below are the built-in VLMEngines. Use `BasicVLMConfig` to set sampling parameters. For OpenAI reasoning models ("o" series), use `OpenAIReasoningVLMConfig` to automatically handle system prompt. 
+The `VLMEngine` class is responsible for configuring VLM for OCR. Children of this abstract class implements `chat` and `chat_async` methods for prompting VLMs with input messages. It also has `get_ocr_messages` method that unifies messages template for image input. Below are the built-in VLMEngines. Use `BasicVLMConfig` to set sampling parameters. For reasoning models, use `ReasoningVLMConfig` to handle reasoning tokens. For OpenAI reasoning models ("o" series), use `OpenAIReasoningVLMConfig` to automatically handle system prompt and reasoning tokens. 
 
 ### OpenAI Compatible
-The OpenAI compatible VLM engine works with a wide variety of VLM inferencing services:
-
-```python
-from vlm4ocr import OpenAIVLMEngine
-
-vlm_engine = OpenAIVLMEngine(model="<mode_name>", base_url="<base_url>", api_key="<api_key>")
-```
+The OpenAI compatible VLM engine works with a wide variety of VLM inferencing services. In general, the parent class `OpenAICompatibleVLMEngine` can be used to create custom engines for services that follow the OpenAI chat-completion API format. Below are some built-in engines that inherit from `OpenAICompatibleVLMEngine`.
 
 #### Locally hosted vLLM server
 Inference engines like [vLLM OpenAI compatible server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html) is supported. To start a server:
 
+##### Qwen3-VL-30B-A3B-Instruct
 ```bash
-vllm serve Qwen/Qwen2.5-VL-7B-Instruct \
-    --api-key EMPTY \
-    --dtype bfloat16 \
+vllm serve Qwen/Qwen3-VL-30B-A3B-Instruct \
     --max-model-len 16000 \ 
-    --limit-mm-per-prompt image=1,video=0
+    --limit-mm-per-prompt '{"images": 1, "videos": 0}'
 ```
 
 Define a VLM engine to work with the vLLM server. 
 
 ```python
-from vlm4ocr import BasicVLMConfig, OpenAIVLMEngine
+from vlm4ocr import BasicVLMConfig, VLLMVLMEngine
 
-vlm_engine = OpenAIVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct", 
-                             base_url="http://localhost:8000/v1", 
-                             api_key="EMPTY",
-                             config=BasicVLMConfig(max_tokens=4096, temperature=0.0)    
-                            )
+vlm_engine = VLLMVLMEngine(model="Qwen/Qwen3-VL-30B-A3B-Instruct", 
+                           config=BasicVLMConfig(max_new_tokens=4096, temperature=0.0)    
+                          )
+```
+
+##### Qwen3-VL-30B-A3B-Thinking
+```bash
+vllm serve Qwen/Qwen3-VL-30B-A3B-Thinking \
+    --max-model-len 64000 \ 
+    --limit-mm-per-prompt '{"images": 1, "videos": 0}' \
+    --reasoning-parser deepseek-r1
+```
+
+Define a VLM engine to work with the vLLM server. 
+
+```python
+from vlm4ocr import ReasoningVLMConfig, VLLMVLMEngine
+
+vlm_engine = VLLMVLMEngine(model="Qwen/Qwen3-VL-30B-A3B-Thinking", 
+                           config=ReasoningVLMConfig(temperature=0.6, top_p=0.95, max_new_tokens=8192)    
+                          )
 ```
 
 #### VLM inference with API servers
 Remote VLM inference servers are supported. We use OpenRouter as an example:
 
 ```python
-from vlm4ocr import BasicVLMConfig, OpenAIVLMEngine
+from vlm4ocr import BasicVLMConfig, OpenRouterVLMEngine
 
-vlm_engine = OpenAIVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct", 
-                             base_url="https://openrouter.ai/api/v1", 
-                             api_key="<OPENROUTER_API_KEY>",
-                             config=BasicVLMConfig(max_tokens=4096, temperature=0.0)  
-                            )
+vlm_engine = OpenRouterVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct", 
+                                 api_key="<OPENROUTER_API_KEY>",
+                                 config=BasicVLMConfig(max_tokens=4096, temperature=0.0)  
+                                )
 ```
 
 ### Ollama
