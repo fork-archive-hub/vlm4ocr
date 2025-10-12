@@ -19,6 +19,9 @@ Vision Language Models (VLMs) for Optical Character Recognition (OCR).
 - [v0.3.0](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.3.0) (Jul 5, 2025): 
   - **Key information extraction with JSON**: instead of OCR the entire document, extract only the key information and output as JSON.
   - **Batch processing to web app**: The web app now supports concurrent batch processing of multiple images using `OCREngine.concurrent_ocr` method as backend. 
+- [v0.3.1](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.3.1) (Oct 11, 2025):
+  - **Added reasoning VLM supports**: Added new configs to support reasoning VLMs (e.g., Qwen-VL-30B-A3B-Thinking, o4-mini). 
+  - **Added OpenAICompatible VLM engines**: Separated the OpenAI compatible VLM engines into a parent class `OpenAICompatibleVLMEngine`.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -43,6 +46,7 @@ Many scanned documents are batch processed and converted into markdown text by o
 ## ⭐Supported Models 
 ### Open-weights (ALL Supported!!)
 **All open-weights VLMs are supported** via our [Ollama](/packages/vlm4ocr/vlm4ocr/vlm_engines.py) and [OpenAI compatible engines](/packages/vlm4ocr/vlm4ocr/vlm_engines.py), including:
+- [Qwen3-VL](https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe)
 - [Qwen2.5-VL](https://huggingface.co/collections/Qwen/qwen25-vl-6795ffac22b334a837c0f9a5)
 - [Llama-3.2](https://huggingface.co/collections/meta-llama/llama-32-66f448ffc8c32f949b04c8cf)
 - [LLaVa-1.5](https://huggingface.co/collections/llava-hf/llava-15-65f762d5b6941db5c2ba07e0)
@@ -116,14 +120,12 @@ pip install vlm4ocr
 ```
 
 ### Quick start
-In this demo, we use a locally deployed [vLLM OpenAI compatible server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html) to run [Qwen2.5-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct).
+In this demo, we use a locally deployed [vLLM OpenAI compatible server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html) to run [Qwen3-VL-30B-A3B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct) model. 
 
 ```python
-from vlm4ocr import OpenAIVLMEngine
+from vlm4ocr import VLLMVLMEngine
 
-vlm_engine = OpenAIVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct", 
-                             base_url="http://localhost:8000/v1", 
-                             api_key="EMPTY")
+vlm_engine = VLLMVLMEngine(model="Qwen/Qwen3-VL-30B-A3B-Instruct")
 ```
 
 To use other VLM inference engines:
@@ -131,9 +133,9 @@ To use other VLM inference engines:
 <summary> OpenAI Compatible</summary>
 
 ```python
-from vlm4ocr import OpenAIVLMEngine
+from vlm4ocr import OpenAICompatibleVLMEngine
 
-vlm_engine = OpenAIVLMEngine(model="<mode_name>", base_url="<base_url>", api_key="<api_key>")
+vlm_engine = OpenAICompatibleVLMEngine(model="<mode_name>", base_url="<base_url>", api_key="<api_key>")
 ```
 </details>
 
@@ -254,7 +256,7 @@ vlm4ocr --input_path /examples/synthesized_data/ \
         --concurrent_batch_size 4
 ```
 
-Use *gpt-4o-mini* to process a PDF with many pages. Since `--output_path` is not specified, outputs and logs will be written to the current work directory. 
+Use *gpt-4.1-mini* to process a PDF with many pages. Since `--output_path` is not specified, outputs and logs will be written to the current work directory. 
 ```sh
 # OpenAI API
 export OPENAI_API_KEY=<api key>
@@ -262,6 +264,6 @@ vlm4ocr --input_path /examples/synthesized_data/GPT-4o_synthesized_note_1.pdf \
         --output_mode HTML \
         --log \
         --vlm_engine openai \
-        --model gpt-4o-mini \
+        --model gpt-4.1-mini \
         --concurrent_batch_size 4
 ```
