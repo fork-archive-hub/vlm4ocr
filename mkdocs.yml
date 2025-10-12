@@ -3,6 +3,8 @@ theme:
     name: material
     features:
       - content.code.highlight
+repo_url: https://github.com/daviden1013/vlm4ocr
+repo_name: daviden1013/vlm4ocr
 
 nav:
     - 'Home': 'index.md'
