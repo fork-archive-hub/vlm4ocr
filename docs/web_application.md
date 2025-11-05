@@ -7,16 +7,24 @@ A ready-to-use web application is included. It supports batch processing, input 
 The easiest way to run VLM4OCR web application is through [Docker](https://docs.docker.com/get-started/get-docker/). The image is available on Docker Hub.
 ```sh
 docker pull daviden1013/vlm4ocr-app:latest
-docker run -p 5000:5000 daviden1013/vlm4ocr-app:latest
+docker run -d -p 5000:5000 daviden1013/vlm4ocr-app:latest
 ```
 Open your web browser and navigate to:
 http://localhost:5000
 
 If port 5000 is already in use on your machine, you can map it to a different local port. For example, to map it to local port 8080:
 ```sh
-docker run -p 8080:5000 daviden1013/vlm4ocr-app:latest
+docker run -d -p 8080:5000 daviden1013/vlm4ocr-app:latest
 ```
 Then visit http://localhost:8080
+
+#### Serving this App on a GPU server where LLM inference is served
+If you are running this web app on a GPU server where the VLM inference is served, while connecting via a local host web browser, use the following command to run the Docker container:
+```bash
+docker run -d --add-host=host.docker.internal:host-gateway -p 8080:5000 daviden1013/vlm4ocr-app:latest 
+```
+
+In the VLM4OCR web UI, set the base URL for the VLM API to `http://host.docker.internal:<port>`
 
 #### Using Ollama with the Dockerized App
 If you are running Ollama on your host machine (outside the Docker container) and want to connect to it from the VLM4OCR web app running inside Docker:
