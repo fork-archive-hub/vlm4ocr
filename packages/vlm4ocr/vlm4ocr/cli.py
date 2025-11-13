@@ -15,7 +15,12 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+# Get our specific logger for CLI messages
 logger = logging.getLogger("vlm4ocr_cli")
+# Get the logger that will receive captured warnings
+# By default, warnings are logged to a logger named 'py.warnings'
+warnings_logger = logging.getLogger('py.warnings')
+
 
 SUPPORTED_IMAGE_EXTS_CLI = ['.pdf', '.tif', '.tiff', '.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp']
 OUTPUT_EXTENSIONS = {'markdown': '.md', 'HTML':'.html', 'text':'.txt'}
@@ -56,17 +61,26 @@ def setup_file_logger(log_dir, timestamp_str, debug_mode):
     log_file_path = os.path.join(log_dir, log_file_name)
 
     file_handler = logging.FileHandler(log_file_path, mode='a')
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s:%(filename)s:%(lineno)d] - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     file_handler.setFormatter(formatter)
     
     log_level = logging.DEBUG if debug_mode else logging.INFO
     file_handler.setLevel(log_level)
     
-    logger.addHandler(file_handler)
+    # Add handler to the root logger to capture all logs (from our logger, 
+    # and from the warnings logger 'py.warnings')
+    root_logger = logging.getLogger()
+    root_logger.addHandler(file_handler)
+    
+    # We still configure our specific logger's level for console output
     logger.info(f"Logging to file: {log_file_path}")
 
 
 def main():
+    # Capture warnings from the 'warnings' module (like RuntimeWarning)
+    # and redirect them to the 'logging' system.
+    logging.captureWarnings(True)
+    
     parser = argparse.ArgumentParser(
         description="VLM4OCR: Perform OCR on images, PDFs, or TIFF files using Vision Language Models. Processing is concurrent by default.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -135,16 +149,23 @@ def main():
     current_timestamp_str = time.strftime("%Y%m%d_%H%M%S")
 
     # --- Configure Logger Level based on args ---
+    # Get root logger to control global level for libraries
+    root_logger = logging.getLogger() 
+
     if args.debug:
-        logger.setLevel(logging.DEBUG)
-        # Set root logger to DEBUG only if our specific logger is DEBUG, to avoid overly verbose library logs unless intended.
-        if logger.getEffectiveLevel() <= logging.DEBUG:
-            logging.getLogger().setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG) # Our logger to DEBUG
+        warnings_logger.setLevel(logging.DEBUG) # Warnings logger to DEBUG
+        root_logger.setLevel(logging.DEBUG) # Root to DEBUG
         logger.debug("Debug mode enabled for console.")
     else:
-        logger.setLevel(logging.INFO) # Default for our CLI's own messages
-        logging.getLogger().setLevel(logging.WARNING) # Keep external libraries quieter by default
-
+        logger.setLevel(logging.INFO) # Our logger to INFO
+        warnings_logger.setLevel(logging.INFO) # Warnings logger to INFO
+        root_logger.setLevel(logging.WARNING) # Root to WARNING (quieter libraries)
+        # Our console handler (from basicConfig) is on the root logger, 
+        # so setting root to WARNING makes console quiet
+        # But our logger (vlm4ocr_cli) is INFO, so if a file handler
+        # is added, it will get INFO messages from 'logger'
+        
     if args.concurrent_batch_size < 1:
         parser.error("--concurrent_batch_size must be 1 or greater.")
 
@@ -183,6 +204,15 @@ def main():
     # --- Setup File Logger (if --log is specified) ---
     if args.log:
         setup_file_logger(effective_output_dir, current_timestamp_str, args.debug)
+        # If logging to file, we want our console to be less verbose
+        # if not in debug mode, so we set the console handler's level higher.
+        if not args.debug:
+            # Find the console handler (from basicConfig) and set its level
+            for handler in root_logger.handlers:
+                if isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr:
+                     handler.setLevel(logging.WARNING)
+                     logger.debug("Set console handler level to WARNING.")
+                     break
 
     logger.debug(f"Parsed arguments: {args}")
 
@@ -286,16 +316,34 @@ def main():
             # console verbosity controlled by logger level.
             show_progress_bar = (num_actual_files > 0) 
 
+            # Only show progress bar if not in debug mode (debug logs would interfere)
+            # and if there are files to process.
+            # If logging to file, console can be quiet (INFO level).
+            # If NOT logging to file, console must be INFO level to show bar.
+            
+            # Determine if progress bar should be active (not disabled)
+            # Disable bar if in debug mode (logs interfere) or no files
+            disable_bar = args.debug or not show_progress_bar
+            
+            # If not logging to file AND not debug, we need console at INFO
+            if not args.log and not args.debug:
+                 for handler in logging.getLogger().handlers:
+                    if isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr:
+                         handler.setLevel(logging.INFO)
+                         logger.debug("Set console handler level to INFO for progress bar.")
+                         break
+
             iterator_wrapper = tqdm.asyncio.tqdm(
                 ocr_task_generator, 
                 total=num_actual_files, 
                 desc="Processing files", 
                 unit="file",
-                disable=not show_progress_bar # disable if no files, or can remove this disable if tqdm handles total=0
+                disable=disable_bar 
             )
             
             async for result_object in iterator_wrapper:
                 if not isinstance(result_object, OCRResult):
+                    # This warning *will* now be captured by the file log
                     logger.warning(f"Received unexpected data type: {type(result_object)}")
                     continue
 
@@ -314,9 +362,12 @@ def main():
                         content_to_write = result_object.to_string()
                         with open(current_ocr_output_file_path, "w", encoding="utf-8") as f:
                             f.write(content_to_write)
-                        # Log less verbosely to console if progress bar is active
-                        if not show_progress_bar or logger.getEffectiveLevel() <= logging.DEBUG:
-                           logger.info(f"OCR result for '{input_file_path_from_result}' saved to: {current_ocr_output_file_path}")
+                        
+                        # MODIFIED: Always log success info.
+                        # This will go to the file log if active.
+                        # It will NOT go to console if console level is WARNING.
+                        logger.info(f"OCR result for '{input_file_path_from_result}' saved to: {current_ocr_output_file_path}")
+
                     except Exception as e:
                         logger.error(f"Error writing output for '{input_file_path_from_result}' to '{current_ocr_output_file_path}': {e}")
             
