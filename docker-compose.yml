@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: services/web_app/Dockerfile
+    image: daviden1013/vlm4ocr-app:latest
     container_name: vlm4ocr_web_app
     restart: always
     environment: []
