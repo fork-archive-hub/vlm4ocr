@@ -7,12 +7,6 @@ WORKDIR /app
 # Install Poppler for PDF processing
 RUN apt-get update && apt-get install -y poppler-utils && rm -rf /var/lib/apt/lists/*
 
-# Copy the vlm4ocr package source
-COPY ./packages/vlm4ocr /app/packages/vlm4ocr
-
-# Install the vlm4ocr package and its dependencies
-RUN pip install --no-cache-dir ./packages/vlm4ocr
-
 # Copy the web application requirements file
 COPY ./services/web_app/requirements.txt /app/services/web_app/requirements.txt
 
