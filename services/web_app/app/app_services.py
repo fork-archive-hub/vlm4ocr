@@ -34,19 +34,35 @@ def _initialize_ocr_engine(form_data):
     vlm_config_type = form_data.get('vlm_config', 'basic')
 
     try:
-        max_new_tokens = int(form_data.get('max_new_tokens', '4096'))
-        temperature = float(form_data.get('temperature', '0.0'))
+        # Handle empty strings from form fields before casting
+        max_tokens_str = form_data.get('max_new_tokens', '4096')
+        max_new_tokens = int(max_tokens_str) if max_tokens_str else 4096
+
+        temperature_str = form_data.get('temperature', '0.0')
+        temperature = float(temperature_str) if temperature_str else 0.0
+
+        top_p_str = form_data.get('top_p', None) 
+        top_p = float(top_p_str) if top_p_str else None 
+
     except (ValueError, TypeError):
-        raise ValueError("Invalid value for Max New Tokens or Temperature.")
+        raise ValueError("Invalid value for Max New Tokens, Temperature, or Top P.")
 
     print(f"Initializing VLM Engine for API: {vlm_api}")
     
     if vlm_config_type == 'reasoning':
         print("Using ReasoningVLMConfig")
-        config = ReasoningVLMConfig(max_new_tokens=max_new_tokens, temperature=temperature)
+        config = ReasoningVLMConfig(
+            max_new_tokens=max_new_tokens, 
+            temperature=temperature,
+            top_p=top_p # Pass top_p
+        )
     else:
         print("Using BasicVLMConfig")
-        config = BasicVLMConfig(max_new_tokens=max_new_tokens, temperature=temperature)
+        config = BasicVLMConfig(
+            max_new_tokens=max_new_tokens, 
+            temperature=temperature,
+            top_p=top_p # Pass top_p
+        )
 
     vlm_engine = None
     if vlm_api == "openai_compatible":
@@ -293,6 +309,7 @@ def process_batch_ocr_stream(batch_id, base_url):
 
 def download_processed_file(batch_id, filename):
     """
+Vlm4ocr/vlm4ocr-7595f2b3c10725d9ce590c3e8dbdf49b537588a8/services/web_app/app/app_services.py
     Finds a specific processed file within a batch directory and sends it,
     now using a robust method to construct the absolute path.
     """

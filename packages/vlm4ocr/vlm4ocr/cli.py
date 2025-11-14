@@ -108,7 +108,8 @@ def main():
     vlm_engine_group.add_argument("--vlm_engine", choices=["openai", "azure_openai", "ollama", "openai_compatible"], required=True, help="VLM engine.")
     vlm_engine_group.add_argument("--model", required=True, help="Model identifier for the VLM engine.")
     vlm_engine_group.add_argument("--max_new_tokens", type=int, default=4096, help="Max new tokens for VLM.")
-    vlm_engine_group.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature.")
+    vlm_engine_group.add_argument("--temperature", type=float, default=None, help="Sampling temperature.")
+    vlm_engine_group.add_argument("--top_p", type=float, default=None, help="Sampling top p.")
 
     openai_group = parser.add_argument_group("OpenAI & OpenAI-Compatible Options")
     openai_group.add_argument("--api_key", default=os.environ.get("OPENAI_API_KEY"), help="API key.")
@@ -220,9 +221,11 @@ def main():
     vlm_engine_instance = None
     try:
         logger.info(f"Initializing VLM engine: {args.vlm_engine} with model: {args.model}")
+        logger.info(f"max_new_tokens: {args.max_new_tokens}, temperature: {args.temperature}, top_p: {args.top_p}")
         config = BasicVLMConfig(
             max_new_tokens=args.max_new_tokens,
-            temperature=args.temperature
+            temperature=args.temperature,
+            top_p=args.top_p
         )
         if args.vlm_engine == "openai":
             if not args.api_key: parser.error("--api_key (or OPENAI_API_KEY) is required for OpenAI.")
