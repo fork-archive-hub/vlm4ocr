@@ -44,11 +44,13 @@ footer {
 }
 
 /* General heading colors for dark theme parts of the app */
-h1, .display-column > div > h3 { 
+h1, h2 {
     color: #ffffff;
     margin-bottom: 10px;
 }
-h2, h3:not(.display-column > div > h3) {
+
+/* Styles the specific panel headers from index.html */
+.panel-header {
     color: #ffffff;
     margin-bottom: 10px;
 }
