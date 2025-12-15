@@ -324,11 +324,12 @@ class OCREngine:
                         print(f"{Fore.RED}Error during OCR for a page in {filename}:{Style.RESET_ALL} {page_e}")
 
             # Add the OCR result to the list
-            ocr_result.status = "success"
+            if ocr_result.status != "error":
+                ocr_result.status = "success"
             ocr_results.append(ocr_result)
 
             if verbose:
-                print(f"{Fore.BLUE}Successfully processed {filename} with {len(ocr_result)} pages.{Style.RESET_ALL}")
+                print(f"{Fore.BLUE}Processed {filename} with {len(ocr_result)} pages.{Style.RESET_ALL}")
                 for page in ocr_result:
                     print(page)
                     print("-" * 80)
@@ -465,7 +466,8 @@ class OCREngine:
                 return result
 
         # Set status to success if no errors occurred
-        result.status = "success"
+        if result.status != "error":
+            result.status = "success"
         result.add_messages_to_log(messages_logger.get_messages_log())
         return result
 
