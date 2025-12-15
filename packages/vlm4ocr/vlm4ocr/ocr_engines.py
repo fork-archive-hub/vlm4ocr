@@ -1,11 +1,11 @@
 import os
-from typing import Tuple, List, Dict, Union, Generator, AsyncGenerator, Iterable
+from typing import Any, Tuple, List, Dict, Union, Generator, AsyncGenerator, Iterable
 import importlib
 import asyncio
 from colorama import Fore, Style   
 import json
 from vlm4ocr.utils import DataLoader, PDFDataLoader, TIFFDataLoader, ImageDataLoader, ImageProcessor, clean_markdown, extract_json, get_default_page_delimiter
-from vlm4ocr.data_types import OCRResult
+from vlm4ocr.data_types import OCRResult, FewShotExample
 from vlm4ocr.vlm_engines import VLMEngine, MessagesLogger
 
 SUPPORTED_IMAGE_EXTS = ['.pdf', '.tif', '.tiff', '.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp']
@@ -60,7 +60,8 @@ class OCREngine:
         self.image_processor = ImageProcessor()
 
 
-    def stream_ocr(self, file_path: str, rotate_correction:bool=False, max_dimension_pixels:int=None) -> Generator[Dict[str, str], None, None]:
+    def stream_ocr(self, file_path: str, rotate_correction:bool=False, max_dimension_pixels:int=None, 
+                   few_shot_examples:List[FewShotExample]=None) -> Generator[Dict[str, str], None, None]:
         """
         This method inputs a file path (image or PDF) and stream OCR results in real-time. This is useful for frontend applications.
         Yields dictionaries with 'type' ('ocr_chunk' or 'page_delimiter') and 'data'.
@@ -73,6 +74,8 @@ class OCREngine:
             If True, applies rotate correction to the images using pytesseract.
         max_dimension_pixels : int, Optional
             The maximum dimension of the image in pixels. Original dimensions will be resized to fit in. If None, no resizing is applied.
+        few_shot_examples : List[FewShotExample], Optional
+            list of few-shot examples.
 
         Returns:
         --------
@@ -90,10 +93,6 @@ class OCREngine:
         file_ext = os.path.splitext(file_path)[1].lower()
         if file_ext not in SUPPORTED_IMAGE_EXTS:
             raise ValueError(f"Unsupported file type: {file_ext}. Supported types are: {SUPPORTED_IMAGE_EXTS}")
-        
-        # Check if image preprocessing can be applied
-        if self.image_processor.has_tesseract==False and rotate_correction:
-            raise ImportError("pytesseract is not installed. Please install it to use rotate correction.")
 
         # PDF or TIFF
         if file_ext in ['.pdf', '.tif', '.tiff']:
@@ -105,8 +104,8 @@ class OCREngine:
             
             # OCR each image
             for i, image in enumerate(images):
-                # Apply rotate correction if specified and tesseract is available
-                if rotate_correction and self.image_processor.has_tesseract:
+                # Apply rotate correction if specified
+                if rotate_correction:
                     try:
                         image, _ = self.image_processor.rotate_correction(image)
                         
@@ -120,7 +119,13 @@ class OCREngine:
                     except Exception as e:
                         yield {"type": "info", "data": f"Error resizing image: {str(e)}"}
 
-                messages = self.vlm_engine.get_ocr_messages(self.system_prompt, self.user_prompt, image)
+                # Get OCR messages
+                messages = self.vlm_engine.get_ocr_messages(system_prompt=self.system_prompt, 
+                                                            user_prompt=self.user_prompt, 
+                                                            image=image,
+                                                            few_shot_examples=few_shot_examples)
+                
+                # Stream response
                 response_stream = self.vlm_engine.chat(
                     messages,
                     stream=True
@@ -137,8 +142,8 @@ class OCREngine:
             data_loader = ImageDataLoader(file_path)
             image = data_loader.get_page(0)
 
-            # Apply rotate correction if specified and tesseract is available
-            if rotate_correction and self.image_processor.has_tesseract:
+            # Apply rotate correction if specified
+            if rotate_correction:
                 try:
                     image, _ = self.image_processor.rotate_correction(image)
                     
@@ -152,7 +157,12 @@ class OCREngine:
                 except Exception as e:
                     yield {"type": "info", "data": f"Error resizing image: {str(e)}"}
 
-            messages = self.vlm_engine.get_ocr_messages(self.system_prompt, self.user_prompt, image)
+            # Get OCR messages
+            messages = self.vlm_engine.get_ocr_messages(system_prompt=self.system_prompt, 
+                                                        user_prompt=self.user_prompt, 
+                                                        image=image,
+                                                        few_shot_examples=few_shot_examples)
+            # Stream response
             response_stream = self.vlm_engine.chat(
                     messages,
                     stream=True
@@ -163,7 +173,7 @@ class OCREngine:
             
 
     def sequential_ocr(self, file_paths: Union[str, Iterable[str]], rotate_correction:bool=False, 
-                       max_dimension_pixels:int=None, verbose:bool=False) -> List[OCRResult]:
+                       max_dimension_pixels:int=None, verbose:bool=False, few_shot_examples:List[FewShotExample]=None) -> List[OCRResult]:
         """
         This method inputs a file path or a list of file paths (image, PDF, TIFF) and performs OCR using the VLM inference engine.
 
@@ -177,6 +187,8 @@ class OCREngine:
             The maximum dimension of the image in pixels. Original dimensions will be resized to fit in. If None, no resizing is applied.
         verbose : bool, Optional
             If True, the function will print the output in terminal.
+        few_shot_examples : List[FewShotExample], Optional
+            list of few-shot examples. Each example is a dict with keys "image" (PIL.Image.Image) and "text" (str).
         
         Returns:
         --------
@@ -186,6 +198,7 @@ class OCREngine:
         if isinstance(file_paths, str):
             file_paths = [file_paths]
 
+        # Iterate through file paths
         ocr_results = []
         for file_path in file_paths:
             # Define OCRResult object
@@ -235,8 +248,8 @@ class OCREngine:
             # OCR images
             for i, image in enumerate(images):
                 image_processing_status = {}
-                # Apply rotate correction if specified and tesseract is available
-                if rotate_correction and self.image_processor.has_tesseract:
+                # Apply rotate correction if specified
+                if rotate_correction:
                     try:
                         image, rotation_angle = self.image_processor.rotate_correction(image)
                         image_processing_status["rotate_correction"] = {
@@ -272,7 +285,10 @@ class OCREngine:
                             print(f"{Fore.RED}Error resizing image for {filename}:{Style.RESET_ALL} {resized['error']}. OCR continues without resizing.")
 
                 try:
-                    messages = self.vlm_engine.get_ocr_messages(self.system_prompt, self.user_prompt, image)
+                    messages = self.vlm_engine.get_ocr_messages(system_prompt=self.system_prompt, 
+                                                                user_prompt=self.user_prompt, 
+                                                                image=image,
+                                                                few_shot_examples=few_shot_examples)
                     # Define a messages logger to capture messages
                     messages_logger = MessagesLogger()
                     # Generate response
@@ -321,7 +337,8 @@ class OCREngine:
 
 
     def concurrent_ocr(self, file_paths: Union[str, Iterable[str]], rotate_correction:bool=False, 
-                       max_dimension_pixels:int=None, concurrent_batch_size: int=32, max_file_load: int=None) -> AsyncGenerator[OCRResult, None]:
+                       max_dimension_pixels:int=None, few_shot_examples:List[FewShotExample]=None, 
+                       concurrent_batch_size: int=32, max_file_load: int=None) -> AsyncGenerator[OCRResult, None]:
         """
         First complete first out. Input and output order not guaranteed.
         This method inputs a file path or a list of file paths (image, PDF, TIFF) and performs OCR using the VLM inference engine. 
@@ -335,6 +352,8 @@ class OCREngine:
             If True, applies rotate correction to the images using pytesseract.
         max_dimension_pixels : int, Optional
             The maximum dimension of the image in pixels. Origianl dimensions will be resized to fit in. If None, no resizing is applied.
+        few_shot_examples : List[FewShotExample], Optional
+            list of few-shot examples. Each example is a dict with keys "image" (PIL.Image.Image) and "text" (str).
         concurrent_batch_size : int, Optional
             The number of concurrent VLM calls to make. 
         max_file_load : int, Optional
@@ -353,18 +372,17 @@ class OCREngine:
 
         if not isinstance(max_file_load, int) or max_file_load <= 0:
             raise ValueError("max_file_load must be a positive integer")
-        
-        if self.image_processor.has_tesseract==False and rotate_correction:
-            raise ImportError("pytesseract is not installed. Please install it to use rotate correction.")
 
         return self._ocr_async(file_paths=file_paths, 
                                rotate_correction=rotate_correction,
                                max_dimension_pixels=max_dimension_pixels,
+                               few_shot_examples=few_shot_examples,
                                concurrent_batch_size=concurrent_batch_size, 
                                max_file_load=max_file_load)
     
 
     async def _ocr_async(self, file_paths: Iterable[str], rotate_correction:bool=False, max_dimension_pixels:int=None, 
+                         few_shot_examples:List[FewShotExample]=None,
                          concurrent_batch_size: int=32, max_file_load: int=None) -> AsyncGenerator[OCRResult, None]:
         """
         Internal method to asynchronously process an iterable of file paths.
@@ -380,7 +398,8 @@ class OCREngine:
                                                  vlm_call_semaphore=vlm_call_semaphore, 
                                                  file_path=file_path, 
                                                  rotate_correction=rotate_correction,
-                                                 max_dimension_pixels=max_dimension_pixels)
+                                                 max_dimension_pixels=max_dimension_pixels,
+                                                 few_shot_examples=few_shot_examples)
             tasks.append(task)
 
         
@@ -389,7 +408,8 @@ class OCREngine:
             yield result
         
     async def _ocr_file_with_semaphore(self, file_load_semaphore:asyncio.Semaphore, vlm_call_semaphore:asyncio.Semaphore, 
-                                       file_path:str, rotate_correction:bool=False, max_dimension_pixels:int=None) -> OCRResult:
+                                       file_path:str, rotate_correction:bool=False, max_dimension_pixels:int=None,
+                                       few_shot_examples:List[FewShotExample]=None) -> OCRResult:
         """
         This internal method takes a semaphore and OCR a single file using the VLM inference engine.
         """
@@ -428,6 +448,7 @@ class OCREngine:
                         page_index=page_index,
                         rotate_correction=rotate_correction,
                         max_dimension_pixels=max_dimension_pixels,
+                        few_shot_examples=few_shot_examples,
                         messages_logger=messages_logger
                     )
                     page_processing_tasks.append(task)
@@ -450,7 +471,7 @@ class OCREngine:
 
     async def _ocr_page_with_semaphore(self, vlm_call_semaphore: asyncio.Semaphore, data_loader: DataLoader,
                                        page_index:int, rotate_correction:bool=False, max_dimension_pixels:int=None,
-                                       messages_logger:MessagesLogger=None) -> Tuple[str, Dict[str, str]]:
+                                       few_shot_examples:List[FewShotExample]=None, messages_logger:MessagesLogger=None) -> Tuple[str, Dict[str, str]]:
         """
         This internal method takes a semaphore and OCR a single image/page using the VLM inference engine.
 
@@ -462,8 +483,8 @@ class OCREngine:
         async with vlm_call_semaphore:
             image = await data_loader.get_page_async(page_index)
             image_processing_status = {}
-            # Apply rotate correction if specified and tesseract is available
-            if rotate_correction and self.image_processor.has_tesseract:
+            # Apply rotate correction if specified
+            if rotate_correction:
                 try:
                     image, rotation_angle = await self.image_processor.rotate_correction_async(image)
                     image_processing_status["rotate_correction"] = {
@@ -490,7 +511,10 @@ class OCREngine:
                         "error": str(e)
                     }
 
-            messages = self.vlm_engine.get_ocr_messages(self.system_prompt, self.user_prompt, image)
+            messages = self.vlm_engine.get_ocr_messages(system_prompt=self.system_prompt, 
+                                                        user_prompt=self.user_prompt, 
+                                                        image=image,
+                                                        few_shot_examples=few_shot_examples)
             response = await self.vlm_engine.chat_async( 
                 messages,
                 messages_logger=messages_logger

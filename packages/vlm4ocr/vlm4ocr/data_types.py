@@ -1,7 +1,8 @@
 import os
 from typing import List, Dict, Literal
+from PIL import Image
 from dataclasses import dataclass, field
-from vlm4ocr.utils import get_default_page_delimiter
+from vlm4ocr.utils import get_default_page_delimiter, ImageProcessor
 
 OutputMode = Literal["markdown", "HTML", "text", "JSON"]
 
@@ -119,3 +120,40 @@ class OCRResult:
             self.page_delimiter = page_delimiter
 
         return self.page_delimiter.join([page.get("text", "") for page in self.pages])
+    
+@dataclass    
+class FewShotExample:
+    """
+    This class represents a few-shot example for OCR tasks.
+
+    Parameters:
+    ----------
+    image : PIL.Image.Image
+        The image associated with the example.
+    text : str
+        The expected OCR result text for the image.
+    rotate_correction : bool, Optional
+        If True, applies rotate correction to the images using pytesseract.
+    max_dimension_pixels : int, Optional
+        The maximum dimension of the image in pixels. Original dimensions will be resized to fit in. If None, no resizing is applied.
+    """
+    image: Image.Image
+    text: str
+    rotate_correction: bool = False
+    max_dimension_pixels: int = None
+    def __post_init__(self):
+        if not isinstance(self.image, Image.Image):
+            raise ValueError("image must be a PIL.Image.Image object")
+        if not isinstance(self.text, str):
+            raise ValueError("text must be a string")
+        
+        if self.rotate_correction or self.max_dimension_pixels is not None:
+            self.image_processor = ImageProcessor()
+
+        # Rotate correction if specified
+        if self.rotate_correction:
+            self.image, _ = self.image_processor.rotate_correction(self.image)
+
+        # Resize image if max_dimension_pixels is specified
+        if self.max_dimension_pixels is not None:
+            self.image, _ = self.image_processor.resize(image=self.image, max_dimension_pixels=self.max_dimension_pixels)

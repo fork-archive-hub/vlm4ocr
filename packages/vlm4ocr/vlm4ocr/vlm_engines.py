@@ -6,6 +6,7 @@ import os
 import re
 from PIL import Image
 from vlm4ocr.utils import image_to_base64
+from vlm4ocr.data_types import FewShotExample
 
 
 class VLMConfig(abc.ABC):
@@ -332,7 +333,7 @@ class VLMEngine:
         return NotImplemented
 
     @abc.abstractmethod
-    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image) -> List[Dict[str,str]]:
+    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, few_shot_examples:List[FewShotExample]=None) -> List[Dict[str,str]]:
         """
         This method inputs an image and returns the correesponding chat messages for the inference engine.
 
@@ -344,6 +345,8 @@ class VLMEngine:
             the user prompt.
         image : Image.Image
             the image for OCR.
+        few_shot_examples : List[FewShotExample], Optional
+            list of few-shot examples. 
         """
         return NotImplemented
     
@@ -557,7 +560,7 @@ class OllamaVLMEngine(VLMEngine):
 
         return res_dict
     
-    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image) -> List[Dict[str,str]]:
+    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, few_shot_examples:List[FewShotExample]=None) -> List[Dict[str,str]]:
         """
         This method inputs an image and returns the correesponding chat messages for the inference engine.
 
@@ -569,16 +572,32 @@ class OllamaVLMEngine(VLMEngine):
             the user prompt.
         image : Image.Image
             the image for OCR.
+        few_shot_examples : List[FewShotExample], Optional
+            list of few-shot examples. 
         """
         base64_str = image_to_base64(image)
-        return [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": user_prompt,
-                "images": [base64_str]
-            }
-        ]
+        output_messages = []
+        # system message
+        system_message = {"role": "system", "content": system_prompt}
+        output_messages.append(system_message)
+
+        # few-shot examples
+        if few_shot_examples is not None:
+            for example in few_shot_examples:
+                if not isinstance(example, FewShotExample):
+                    raise ValueError("Few-shot example must be a FewShotExample object.")
+                
+                example_image_b64 = image_to_base64(example.image)
+                example_user_message = {"role": "user", "content": user_prompt, "images": [example_image_b64]}
+                example_agent_message = {"role": "assistant", "content": example.text}
+                output_messages.append(example_user_message)
+                output_messages.append(example_agent_message)
+
+        # user message
+        user_message = {"role": "user", "content": user_prompt, "images": [base64_str]}
+        output_messages.append(user_message)
+
+        return output_messages
 
 
 class OpenAICompatibleVLMEngine(VLMEngine):
@@ -792,7 +811,8 @@ class OpenAICompatibleVLMEngine(VLMEngine):
 
         return res_dict
     
-    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, format:str='png', detail:str="high") -> List[Dict[str,str]]:
+    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, format:str='png', 
+                         detail:str="high", few_shot_examples:List[FewShotExample]=None) -> List[Dict[str,str]]:
         """
         This method inputs an image and returns the correesponding chat messages for the inference engine.
 
@@ -808,24 +828,55 @@ class OpenAICompatibleVLMEngine(VLMEngine):
             the image format. 
         detail : str, Optional
             the detail level of the image. Default is "high". 
+        few_shot_examples : List[FewShotExample], Optional
+            list of few-shot examples.
         """
         base64_str = image_to_base64(image)
-        return [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/{format};base64,{base64_str}",
-                            "detail": detail
+        output_messages = []
+        # system message
+        system_message = {"role": "system", "content": system_prompt}
+        output_messages.append(system_message)
+
+        # few-shot examples
+        if few_shot_examples is not None:
+            for example in few_shot_examples:
+                if not isinstance(example, FewShotExample):
+                    raise ValueError("Few-shot example must be a FewShotExample object.")
+                
+                example_image_b64 = image_to_base64(example.image)
+                example_user_message = {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/{format};base64,{example_image_b64}",
+                                "detail": detail
+                            },
                         },
+                        {"type": "text", "text": user_prompt},
+                    ],
+                }
+                example_agent_message = {"role": "assistant", "content": example.text}
+                output_messages.append(example_user_message)
+                output_messages.append(example_agent_message)
+
+        # user message
+        user_message = {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/{format};base64,{base64_str}",
+                        "detail": detail
                     },
-                    {"type": "text", "text": user_prompt},
-                ],
-            },
-        ]
+                },
+                {"type": "text", "text": user_prompt},
+            ],
+        }
+        output_messages.append(user_message)
+        return output_messages
 
 
 class VLLMVLMEngine(OpenAICompatibleVLMEngine):
@@ -1096,7 +1147,8 @@ class OpenAIVLMEngine(VLMEngine):
 
         return res_dict
     
-    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, format:str='png', detail:str="high") -> List[Dict[str,str]]:
+    def get_ocr_messages(self, system_prompt:str, user_prompt:str, image:Image.Image, format:str='png', 
+                         detail:str="high", few_shot_examples:List[FewShotExample]=None) -> List[Dict[str,str]]:
         """
         This method inputs an image and returns the correesponding chat messages for the inference engine.
 
@@ -1112,24 +1164,55 @@ class OpenAIVLMEngine(VLMEngine):
             the image format. 
         detail : str, Optional
             the detail level of the image. Default is "high". 
+        few_shot_examples : List[FewShotExample], Optional
+            list of few-shot examples. Each example is a dict with keys "image" (PIL.Image.Image) and "text" (str).
         """
         base64_str = image_to_base64(image)
-        return [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/{format};base64,{base64_str}",
-                            "detail": detail
+        output_messages = []
+        # system message
+        system_message = {"role": "system", "content": system_prompt}
+        output_messages.append(system_message)
+
+        # few-shot examples
+        if few_shot_examples is not None:
+            for example in few_shot_examples:
+                if not isinstance(example, FewShotExample):
+                    raise ValueError("Few-shot example must be a FewShotExample object.")
+                
+                example_image_b64 = image_to_base64(example.image)
+                example_user_message = {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/{format};base64,{example_image_b64}",
+                                "detail": detail
+                            },
                         },
+                        {"type": "text", "text": user_prompt},
+                    ],
+                }
+                example_agent_message = {"role": "assistant", "content": example.text}
+                output_messages.append(example_user_message)
+                output_messages.append(example_agent_message)
+
+        # user message
+        user_message = {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/{format};base64,{base64_str}",
+                        "detail": detail
                     },
-                    {"type": "text", "text": user_prompt},
-                ],
-            },
-        ]
+                },
+                {"type": "text", "text": user_prompt},
+            ],
+        }
+        output_messages.append(user_message)
+        return output_messages
 
 
 class AzureOpenAIVLMEngine(OpenAIVLMEngine):
