@@ -308,6 +308,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#serving-this-app-on-a-gpu-server-where-llm-inference-is-served" class="md-nav__link">
+    <span class="md-ellipsis">
+      Serving this App on a GPU server where LLM inference is served
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#using-ollama-with-the-dockerized-app" class="md-nav__link">
     <span class="md-ellipsis">
       Using Ollama with the Dockerized App
@@ -698,6 +707,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#serving-this-app-on-a-gpu-server-where-llm-inference-is-served" class="md-nav__link">
+    <span class="md-ellipsis">
+      Serving this App on a GPU server where LLM inference is served
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#using-ollama-with-the-dockerized-app" class="md-nav__link">
     <span class="md-ellipsis">
       Using Ollama with the Dockerized App
@@ -812,32 +830,37 @@
 <h3 id="running-with-docker">Running with Docker</h3>
 <p>The easiest way to run VLM4OCR web application is through <a href="https://docs.docker.com/get-started/get-docker/">Docker</a>. The image is available on Docker Hub.
 </p><div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>daviden1013/vlm4ocr-app:latest
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span><span class="m">5000</span>:5000<span class="w"> </span>daviden1013/vlm4ocr-app:latest
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>-p<span class="w"> </span><span class="m">5000</span>:5000<span class="w"> </span>daviden1013/vlm4ocr-app:latest
 </code></pre></div>
 Open your web browser and navigate to:
 http://localhost:5000
 <p>If port 5000 is already in use on your machine, you can map it to a different local port. For example, to map it to local port 8080:
-</p><div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span><span class="m">8080</span>:5000<span class="w"> </span>daviden1013/vlm4ocr-app:latest
+</p><div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>-p<span class="w"> </span><span class="m">8080</span>:5000<span class="w"> </span>daviden1013/vlm4ocr-app:latest
 </code></pre></div>
 Then visit http://localhost:8080
+<h4 id="serving-this-app-on-a-gpu-server-where-llm-inference-is-served">Serving this App on a GPU server where LLM inference is served</h4>
+<p>If you are running this web app on a GPU server where the VLM inference is served, while connecting via a local host web browser, use the following command to run the Docker container:
+</p><div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--add-host<span class="o">=</span>host.docker.internal:host-gateway<span class="w"> </span>-p<span class="w"> </span><span class="m">8080</span>:5000<span class="w"> </span>daviden1013/vlm4ocr-app:latest<span class="w"> </span>
+</code></pre></div>
+<p>In the VLM4OCR web UI, set the base URL for the VLM API to <code>http://host.docker.internal:&lt;port&gt;</code></p>
 <h4 id="using-ollama-with-the-dockerized-app">Using Ollama with the Dockerized App</h4>
 <p>If you are running Ollama on your host machine (outside the Docker container) and want to connect to it from the VLM4OCR web app running inside Docker:</p>
 <p><strong>Docker Desktop (Windows/Mac):</strong> In the VLM4OCR web UI, set the Ollama Host to http://host.docker.internal:11434.
 <strong>Linux:</strong> Run the Docker container with host networking:
-</p><div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--network<span class="o">=</span><span class="s2">"host"</span><span class="w"> </span>daviden1013/vlm4ocr-app:latest
+</p><div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--network<span class="o">=</span><span class="s2">"host"</span><span class="w"> </span>daviden1013/vlm4ocr-app:latest
 </code></pre></div>
 With <code>--network="host"</code>, you don't need the <code>-p</code> flag for port mapping (the container will use the host's network directly, so the app will be available at http://localhost:5000). Then, in the VLM4OCR web app, you can use the default http://localhost:11434 for the Ollama Host.
 <h3 id="install-from-source">Install from source</h3>
 <p>Alternatively, you can clone this repo and run VLM4OCR web application from source:
-</p><div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Install python package</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pip<span class="w"> </span>install<span class="w"> </span>vlm4ocr<span class="w"> </span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Clone source code</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/daviden1013/vlm4ocr.git
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Run Web App</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nb">cd</span><span class="w"> </span>vlm4ocr/services/web_app
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>python<span class="w"> </span>run.py
+</p><div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Install python package</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pip<span class="w"> </span>install<span class="w"> </span>vlm4ocr<span class="w"> </span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Clone source code</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/daviden1013/vlm4ocr.git
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Run Web App</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="nb">cd</span><span class="w"> </span>vlm4ocr/services/web_app
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>python<span class="w"> </span>run.py
 </code></pre></div>
 <h2 id="usage">Usage</h2>
 <h4 id="select-single-file-or-batch-processing">Select single file or batch processing</h4>

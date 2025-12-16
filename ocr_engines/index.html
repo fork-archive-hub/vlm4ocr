@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#batch-ocr" class="md-skip">
+        <a href="#concurrent-ocr" class="md-skip">
           Skip to content
         </a>
       
@@ -418,13 +418,13 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#batch-ocr" class="md-nav__link">
+  <a href="#concurrent-ocr" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch OCR
+      Concurrent OCR
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Batch OCR">
+    <nav class="md-nav" aria-label="Concurrent OCR">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -454,6 +454,15 @@
   <a href="#stream-ocr" class="md-nav__link">
     <span class="md-ellipsis">
       Stream OCR
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#few-shot-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Few-shot Examples
     </span>
   </a>
   
@@ -614,13 +623,13 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#batch-ocr" class="md-nav__link">
+  <a href="#concurrent-ocr" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch OCR
+      Concurrent OCR
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Batch OCR">
+    <nav class="md-nav" aria-label="Concurrent OCR">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -655,6 +664,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#few-shot-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Few-shot Examples
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -676,7 +694,7 @@
 
   <h1>OCR Engine</h1>
 
-<div><p>OCR engine handles the OCR process. It supports <a href="#batch-ocr">batch processing</a> which is ideal for large amount of input files; <a href="#sequential-ocr">sequential processing</a> which is good for lightweight tasks or testing; <a href="#stream-ocr">streaming</a> that streams OCR results which is designed for frontend integration. </p>
+<div><p>OCR engine handles the OCR process. It supports <a href="#concurrent-ocr">concurrent processing</a> which is ideal for large amount of input files; <a href="#sequential-ocr">sequential processing</a> which is good for lightweight tasks or testing; <a href="#stream-ocr">streaming</a> that streams OCR results which is designed for frontend integration. </p>
 <p>OCR engine requires an <a href="../vlm_engines/">VLM engine</a> instance and an <code>output_mode</code> as one of <em>markdown</em>, <em>HTML</em>, <em>text</em>, or <em>JSON</em>. The optional <code>user_prompt</code> can be used to provide additional information about the input files. For example, <em>The input is a scanned MRI report</em>. Note that for <code>output_mode="JSON"</code>, the <code>user_prompt</code> is required to define the structure of the JSON output.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">OCREngine</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -693,14 +711,15 @@
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>headers (e.g., "##"). You will ignore images, icons, or anything that can \
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>not be converted into text.
 </code></pre></div>
-<h2 id="batch-ocr">Batch OCR</h2>
-<p><code>concurrent_ocr</code> is the recommended method to process large amount of files. The method returns an async generator of <code>OCRResult</code> instance (<code>AsyncGenerator[OCRResult, None]</code>). OCR results are generated whenever is ready (first-done-first-out). <strong>There is no guarantee the input order and output order will match. Use the <code>OCRResult.filename</code> as identifier</strong>. The <code>file_paths</code> is a single file (image, PDF, TIFF) or a list of file directories. <code>rotate_correction</code> use <a href="https://pypi.org/project/pytesseract/">Tesseract</a> to correct for rotation. <strong>Please install Tesseract to use this feature</strong>. <code>max_dimension_pixels</code> resize images to ensure the largest dimension (width or length) are less than the maximum allowed pixels. <code>concurrent_batch_size</code> is the number of images/pages that VLM processes at a time. This is used to manage inferencing resource (usually GPU). The <code>max_file_load</code> is the number of input files to be pre-loaded for staging. This manages the I/O and memory (dRAM) resources. By default, <code>max_file_load</code> is twice of <code>concurrent_batch_size</code>. </p>
+<h2 id="concurrent-ocr">Concurrent OCR</h2>
+<p><code>concurrent_ocr</code> is the recommended method to process large amount of files. The method returns an async generator of <code>OCRResult</code> instance (<code>AsyncGenerator[OCRResult, None]</code>). OCR results are generated whenever is ready (first-done-first-out). <strong>There is no guarantee the input order and output order will match. Use the <code>OCRResult.filename</code> as identifier</strong>. The <code>file_paths</code> is a single file (image, PDF, TIFF) or a list of file directories. <code>rotate_correction</code> use <a href="https://pypi.org/project/pytesseract/">Tesseract</a> to correct for rotation. <strong>Please install Tesseract to use this feature</strong>. <code>max_dimension_pixels</code> resize images to ensure the largest dimension (width or length) are less than the maximum allowed pixels. Few-shot examples can be provided via <code>few_shot_examples</code> parameter to improve OCR accuracy. <code>concurrent_batch_size</code> is the number of images/pages that VLM processes at a time. This is used to manage inferencing resource (usually GPU). The <code>max_file_load</code> is the number of input files to be pre-loaded for staging. This manages the I/O and memory (dRAM) resources. By default, <code>max_file_load</code> is twice of <code>concurrent_batch_size</code>. </p>
 <p>The code below runs OCR in batches of 4 images/pages, while having 8 files pre-loaded to ensure efficiency. 
 </p><div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">response</span> <span class="o">=</span> <span class="n">ocr</span><span class="o">.</span><span class="n">concurrent_ocr</span><span class="p">(</span><span class="n">file_paths</span><span class="o">=&lt;</span><span class="n">a</span> <span class="nb">list</span> <span class="n">of</span> <span class="n">files</span><span class="o">&gt;</span><span class="p">,</span> 
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>                              <span class="n">rotate_correction</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                              <span class="n">max_dimension_pixels</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                              <span class="n">concurrent_batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                              <span class="n">max_file_load</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                              <span class="n">few_shot_examples</span><span class="o">=&lt;</span><span class="n">optional</span><span class="p">,</span> <span class="n">a</span> <span class="nb">list</span> <span class="n">of</span> <span class="n">few</span><span class="o">-</span><span class="n">shot</span> <span class="n">examples</span><span class="o">&gt;</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                              <span class="n">concurrent_batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                              <span class="n">max_file_load</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 </code></pre></div>
 <h4 id="example-dynamic-output-writing">Example: dynamic output-writing</h4>
 <p>The example below use <code>concurrent_ocr</code> to perform OCR and write available results to file.</p>
@@ -744,6 +763,29 @@
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">chunk</span><span class="p">[</span><span class="s2">"data"</span><span class="p">],</span> <span class="n">end</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">elif</span> <span class="n">chunk</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"page_delimiter"</span><span class="p">:</span>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">chunk</span><span class="p">[</span><span class="s2">"data"</span><span class="p">])</span>
+</code></pre></div>
+<h2 id="few-shot-examples">Few-shot Examples</h2>
+<p>Few-shot examples can be provided to improve OCR accuracy. Each example is an object of <code>FewShotExample</code> class that contains <code>image</code> and <code>text</code> attributes. Note that the output text should be the exact text you expect the VLM to generate for the given input image. <strong>Do not include any additional explanations or variations</strong>. Few-shot examples can also include a <code>max_dimension_pixels</code> parameter to resize the image while maintaining the aspect ratio. This is useful when the original image size exceeds the VLM's maximum input size. Few-shot examples can also include a <code>rotate_correction</code> parameter to automatically correct the image orientation before feeding it to the VLM.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span> <span class="nn">os</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">from</span> <span class="nn">vlm4ocr</span> <span class="kn">import</span> <span class="n">FewShotExample</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># Load few-shot examples</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">example_1_image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"&lt;path_to_example_1_image&gt;"</span><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">example_1_text</span> <span class="o">=</span> <span class="s2">"""&lt;expected output text for example 1&gt;"""</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">example_2_image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"&lt;path_to_example_2_image&gt;"</span><span class="p">)</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">example_2_text</span> <span class="o">=</span> <span class="s2">"""&lt;expected output text for example 2&gt;"""</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="n">few_shot_examples</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="n">FewShotExample</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="n">example_1_image</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">example_1_text</span><span class="p">,</span> <span class="n">rotate_correction</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_dimension_pixels</span><span class="o">=</span><span class="mi">512</span><span class="p">),</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="n">FewShotExample</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="n">example_2_image</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">example_2_text</span><span class="p">,</span> <span class="n">rotate_correction</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_dimension_pixels</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="p">]</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="c1"># Use few-shot examples in OCR</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="n">ocr_results</span> <span class="o">=</span> <span class="n">ocr</span><span class="o">.</span><span class="n">sequential_ocr</span><span class="p">([</span><span class="n">image_path_1</span><span class="p">,</span> <span class="n">image_path_2</span><span class="p">],</span> 
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>                                 <span class="n">few_shot_examples</span><span class="o">=</span><span class="n">few_shot_examples</span><span class="p">,</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>                                 <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div></div>
 
 
