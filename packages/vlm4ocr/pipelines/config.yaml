@@ -1,0 +1,21 @@
+---
+  run_name: "default_run"
+  # VLM Engine Configuration
+  vlm_engine:
+    model: "<your-model-name>"
+    base_url: "<your-vlm-endpoint-url>"
+    config: BasicVLMConfig(max_new_tokens=8192)
+  # OCR Engine Configuration
+  ocr_engine:
+    # OCR output format
+    output_mode: "markdown"
+    # number of pages to process in concurrent 
+    concurrent_batch_size: 8
+    # maximum number of files to load into memory at once
+    max_file_load: 16
+    # user prompt file path
+    user_prompt_path: <path-to-your-prompt-file>
+
+  input_directory: "<path-to-your-input-directory>"
+  output_directory: "<path-to-your-output-directory>"
+  messages_log_directory: "<path-to-your-messages-log-directory>"
