@@ -238,7 +238,7 @@ Supply few-shot examples to improve OCR accuracy:
 ```python
 from PIL import Image
 import asyncio
-from vlm4ocr import FewShotExample, AzureOpenAIVLMEngine, OCREngine
+from vlm4ocr import FewShotExample, VLLMVLMEngine, OCREngine
 
 # Load few-shot examples
 # Note that the example text should be the expected OCR output for the example image. Do not include any extra instructions.

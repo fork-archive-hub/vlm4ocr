@@ -9,9 +9,9 @@ pip install vlm4ocr
 In this demo, we use a locally deployed [vLLM OpenAI compatible server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html) to run [Qwen2.5-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct). For more inference APIs and VLMs, please see [VLMEngine](./vlm_engines.md). 
 
 ```python
-from vlm4ocr import vLLMOpenAIEngine
+from vlm4ocr import VLLMVLMEngine
 
-vlm_engine = vLLMOpenAIEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
+vlm_engine = VLLMVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
 ```
 
 We define OCR engine and specify output formats.
@@ -159,10 +159,10 @@ image_path = os.path.join("examples", "synthesized_data", "few_shot_examples", "
 As before, we define the VLM engine and OCR engine.
 
 ```python
-from vlm4ocr import vLLMOpenAIEngine, OCREngine
+from vlm4ocr import VLLMVLMEngine, OCREngine
 
 # Define VLM engine
-vlm_engine = vLLMOpenAIEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
+vlm_engine = VLLMVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
 
 # Define OCR engine
 ocr = OCREngine(vlm_engine, output_mode="text")      
@@ -206,10 +206,10 @@ image_path = os.path.join("examples", "synthesized_data", "few_shot_examples", "
 We define the VLM engine, JSON extraction schema, and OCR engine.
 
 ```python
-from vlm4ocr import vLLMOpenAIEngine, OCREngine
+from vlm4ocr import VLLMVLMEngine, OCREngine
 
 # Define VLM engine
-vlm_engine = vLLMOpenAIEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
+vlm_engine = VLLMVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
 
 # Define JSON extraction schema
 user_prompt = """
