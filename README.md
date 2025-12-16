@@ -22,6 +22,8 @@ Vision Language Models (VLMs) for Optical Character Recognition (OCR).
 - [v0.3.1](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.3.1) (Oct 11, 2025):
   - **Added reasoning VLM supports**: Added new configs to support reasoning VLMs (e.g., Qwen-VL-30B-A3B-Thinking, o4-mini). 
   - **Added OpenAICompatible VLM engines**: Separated the OpenAI compatible VLM engines into a parent class `OpenAICompatibleVLMEngine`.
+- [v0.4.0](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.4.0) (Dec 15, 2025):
+  - **Few-shot examples**: Added support for few-shot examples to improve OCR accuracy.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -222,6 +224,39 @@ import asyncio
 
 async def run_ocr():
     response = ocr.concurrent_ocr([image_path_1, image_path_2], concurrent_batch_size=4)
+    async for result in response:
+        if result.status == "success":
+            filename = result.filename
+            ocr_text = result.to_string()
+            with open(f"{filename}.md", "w", encoding="utf-8") as f:
+                f.write(ocr_text)
+
+asyncio.run(run_ocr())
+```
+
+Supply few-shot examples to improve OCR accuracy:
+```python
+from PIL import Image
+import asyncio
+from vlm4ocr import FewShotExample, AzureOpenAIVLMEngine, OCREngine
+
+# Load few-shot examples
+# Note that the example text should be the expected OCR output for the example image. Do not include any extra instructions.
+example_1_image = Image.open("example_1.JPG"))
+with open("example_1.txt", "r") as f:
+    example_1_text = f.read()
+
+example_2_image = Image.open("example_2.JPG")
+with open("example_2.txt", "r") as f:
+    example_2_text = f.read()
+
+few_shot_examples = [
+    FewShotExample(image=example_1_image, text=example_1_text, max_dimension_pixels=512),
+    FewShotExample(image=example_2_image, text=example_2_text, max_dimension_pixels=512)
+]
+
+async def run_ocr():
+    response = ocr.concurrent_ocr([image_path_1, image_path_2], concurrent_batch_size=4, few_shot_examples=few_shot_examples)
     async for result in response:
         if result.status == "success":
             filename = result.filename

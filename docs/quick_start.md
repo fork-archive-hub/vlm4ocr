@@ -9,11 +9,9 @@ pip install vlm4ocr
 In this demo, we use a locally deployed [vLLM OpenAI compatible server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html) to run [Qwen2.5-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct). For more inference APIs and VLMs, please see [VLMEngine](./vlm_engines.md). 
 
 ```python
-from vlm4ocr import OpenAIVLMEngine
+from vlm4ocr import vLLMOpenAIEngine
 
-vlm_engine = OpenAIVLMEngine(model="Qwen/Qwen2.5-VL-7B-Instruct", 
-                             base_url="http://localhost:8000/v1", 
-                             api_key="EMPTY")
+vlm_engine = vLLMOpenAIEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
 ```
 
 We define OCR engine and specify output formats.
@@ -125,4 +123,111 @@ async def run_ocr():
             print(f"Error processing {result.filename}: {result.error}")
 
 asyncio.run(run_ocr())
+```
+
+## Few-shot examples
+Few-shot examples can be provided to improve the accuracy. Below are examples of how to include few-shot examples in the OCR engine.
+
+### Few-shot examples for full-text OCR
+First, we prepare a list of few-shot examples. Each example is an object of `FewShotExample` that contains an input image (`PIL.Image.Image`) and the corresponding expected output text. Note that the output text should be the exact text you expect the VLM to generate for the given input image. **Do not include any additional explanations or variations**. Few-shot examples can also include a `max_dimension_pixels` parameter to resize the image while maintaining the aspect ratio. This is useful when the original image size exceeds the VLM's maximum input size. Few-shot examples can also include a `rotate_correction` parameter to automatically correct the image orientation before feeding it to the VLM.
+The few-shot example images and text are available in the `examples/synthesized_data/few_shot_examples/` folder in this repository.
+```python
+import os
+from PIL import Image
+from vlm4ocr import FewShotExample
+
+# Load few-shot examples
+example_1_image = Image.open(os.path.join("examples", "synthesized_data", "few_shot_examples", "images", "template_1_sample_4_poor.JPG"))
+with open(os.path.join("examples", "synthesized_data", "few_shot_examples", "ground_truth", "template_1_sample_4_poor.txt"), "r") as f:
+    example_1_text = f.read()
+
+example_2_image = Image.open(os.path.join("examples", "synthesized_data", "few_shot_examples", "images", "template_3_sample_4_poor.JPG"))
+with open(os.path.join("examples", "synthesized_data", "few_shot_examples", "ground_truth", "template_3_sample_4_poor.txt"), "r") as f:
+    example_2_text = f.read()
+
+few_shot_examples = [
+    FewShotExample(image=example_1_image, text=example_1_text, max_dimension_pixels=512),
+    FewShotExample(image=example_2_image, text=example_2_text, max_dimension_pixels=512)
+]
+```
+
+We load the target image for OCR.
+```python
+image_path = os.path.join("examples", "synthesized_data", "few_shot_examples", "images", "template_6_sample_4_poor.JPG")
+```
+
+As before, we define the VLM engine and OCR engine.
+
+```python
+from vlm4ocr import vLLMOpenAIEngine, OCREngine
+
+# Define VLM engine
+vlm_engine = vLLMOpenAIEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
+
+# Define OCR engine
+ocr = OCREngine(vlm_engine, output_mode="text")      
+```
+
+But this time, we pass the few-shot examples to the OCR methods.
+
+```python
+# OCR for a single image
+ocr_results = ocr.sequential_ocr(image_path, max_dimension_pixels=512, verbose=True, few_shot_examples=few_shot_examples)
+```
+
+
+### Few-shot examples for key information extraction with JSON
+```python
+import os
+from PIL import Image
+from vlm4ocr import FewShotExample
+
+# Load few-shot examples
+example_1_image = Image.open(os.path.join("examples", "synthesized_data", "few_shot_examples", "images", "template_1_sample_4_poor.JPG"))
+with open(os.path.join("examples", "synthesized_data", "few_shot_examples", "ground_truth", "template_1_sample_4_poor.json"), "r") as f:
+    example_1_text = f.read()
+
+example_2_image = Image.open(os.path.join("examples", "synthesized_data", "few_shot_examples", "images", "template_3_sample_4_poor.JPG"))
+with open(os.path.join("examples", "synthesized_data", "few_shot_examples", "ground_truth", "template_3_sample_4_poor.json"), "r") as f:
+    example_2_text = f.read()
+
+few_shot_examples = [
+    FewShotExample(image=example_1_image, text=example_1_text, max_dimension_pixels=512),
+    FewShotExample(image=example_2_image, text=example_2_text, max_dimension_pixels=512)
+]
+```
+
+
+We load the target image for OCR.
+```python
+image_path = os.path.join("examples", "synthesized_data", "few_shot_examples", "images", "template_6_sample_4_poor.JPG")
+```
+
+We define the VLM engine, JSON extraction schema, and OCR engine.
+
+```python
+from vlm4ocr import vLLMOpenAIEngine, OCREngine
+
+# Define VLM engine
+vlm_engine = vLLMOpenAIEngine(model="Qwen/Qwen2.5-VL-7B-Instruct")
+
+# Define JSON extraction schema
+user_prompt = """
+Your output should include keys: "Patient", "MRN". 
+For example:
+{
+    "Patient": "John Doe",
+    "MRN": "12345"
+}
+"""
+
+# Define OCR engine
+ocr = OCREngine(vlm_engine, output_mode="JSON", user_prompt=user_prompt)      
+```
+
+But this time, we pass the few-shot examples to the OCR methods.
+
+```python
+# OCR for a single image
+ocr_results = ocr.sequential_ocr(image_path, max_dimension_pixels=512, verbose=True, few_shot_examples=few_shot_examples)
 ```
