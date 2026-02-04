@@ -126,9 +126,8 @@ class OCREngine:
                                                             few_shot_examples=few_shot_examples)
                 
                 # Stream response
-                response_stream = self.vlm_engine.chat(
-                    messages,
-                    stream=True
+                response_stream = self.vlm_engine.chat_stream(
+                    messages
                 )
                 for chunk in response_stream:
                     if chunk["type"] == "response":
@@ -163,9 +162,8 @@ class OCREngine:
                                                         image=image,
                                                         few_shot_examples=few_shot_examples)
             # Stream response
-            response_stream = self.vlm_engine.chat(
-                    messages,
-                    stream=True
+            response_stream = self.vlm_engine.chat_stream(
+                    messages
                 )
             for chunk in response_stream:
                 if chunk["type"] == "response":
@@ -295,7 +293,6 @@ class OCREngine:
                     response = self.vlm_engine.chat(
                         messages,
                         verbose=verbose,
-                        stream=False,
                         messages_logger=messages_logger
                     )
                     ocr_text = response["response"]
