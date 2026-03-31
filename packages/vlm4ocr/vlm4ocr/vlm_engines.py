@@ -15,6 +15,7 @@ from llm_inference_engine.engines import (
     OllamaInferenceEngine,
     OpenAICompatibleInferenceEngine,
     VLLMInferenceEngine,
+    SGLangInferenceEngine,
     OpenRouterInferenceEngine,
     OpenAIInferenceEngine,
     AzureOpenAIInferenceEngine,
@@ -168,6 +169,28 @@ class VLLMVLMEngine(VLLMInferenceEngine, OpenAICompatibleVLMEngine):
         the base url for the vLLM server. 
     config : LLMConfig
         the LLM configuration.
+    """
+    pass
+
+class SGLangVLMEngine(SGLangInferenceEngine, OpenAICompatibleInferenceEngine):
+    """
+    SGLang OpenAI compatible API inference engine.
+    https://docs.sglang.ai/basic_usage/openai_api.html
+
+    Parameters:
+    ----------
+    model_name : str
+        model name as shown in the vLLM server
+    api_key : str, Optional
+        the API key for the vLLM server.
+    base_url : str, Optional
+        the base url for the vLLM server. 
+    config : LLMConfig, Optional
+        the LLM configuration.
+    max_concurrent_requests : int, Optional
+        the maximum number of concurrent requests.
+    max_requests_per_minute : int, Optional
+        the maximum number of requests per minute.
     """
     pass
 
