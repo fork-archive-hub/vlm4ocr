@@ -59,24 +59,27 @@ class OllamaVLMEngine(OllamaInferenceEngine, VLMEngine):
         """
         base64_str = image_to_base64(image)
         output_messages = []
-        # system message
-        system_message = {"role": "system", "content": system_prompt}
-        output_messages.append(system_message)
+        # system message (omitted when system_prompt is None)
+        if system_prompt is not None:
+            output_messages.append({"role": "system", "content": system_prompt})
 
         # few-shot examples
         if few_shot_examples is not None:
             for example in few_shot_examples:
                 if not isinstance(example, FewShotExample):
                     raise ValueError("Few-shot example must be a FewShotExample object.")
-                
+
                 example_image_b64 = image_to_base64(example.image)
                 example_user_message = {"role": "user", "content": user_prompt, "images": [example_image_b64]}
                 example_agent_message = {"role": "assistant", "content": example.text}
                 output_messages.append(example_user_message)
                 output_messages.append(example_agent_message)
 
-        # user message
-        user_message = {"role": "user", "content": user_prompt, "images": [base64_str]}
+        # user message (text omitted when user_prompt is None)
+        if user_prompt is not None:
+            user_message = {"role": "user", "content": user_prompt, "images": [base64_str]}
+        else:
+            user_message = {"role": "user", "content": "", "images": [base64_str]}
         output_messages.append(user_message)
 
         return output_messages
@@ -105,49 +108,46 @@ class OpenAICompatibleVLMEngine(OpenAICompatibleInferenceEngine, VLMEngine):
         """
         base64_str = image_to_base64(image)
         output_messages = []
-        # system message
-        system_message = {"role": "system", "content": system_prompt}
-        output_messages.append(system_message)
+        # system message (omitted when system_prompt is None)
+        if system_prompt is not None:
+            output_messages.append({"role": "system", "content": system_prompt})
 
         # few-shot examples
         if few_shot_examples is not None:
             for example in few_shot_examples:
                 if not isinstance(example, FewShotExample):
                     raise ValueError("Few-shot example must be a FewShotExample object.")
-                
+
                 example_image_b64 = image_to_base64(example.image)
-                example_user_message = {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/{format};base64,{example_image_b64}",
-                                "detail": detail
-                            },
+                example_user_content = [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/{format};base64,{example_image_b64}",
+                            "detail": detail
                         },
-                        {"type": "text", "text": user_prompt},
-                    ],
-                }
+                    },
+                ]
+                if user_prompt is not None:
+                    example_user_content.append({"type": "text", "text": user_prompt})
+                example_user_message = {"role": "user", "content": example_user_content}
                 example_agent_message = {"role": "assistant", "content": example.text}
                 output_messages.append(example_user_message)
                 output_messages.append(example_agent_message)
 
-        # user message
-        user_message = {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/{format};base64,{base64_str}",
-                        "detail": detail
-                    },
+        # user message (text omitted when user_prompt is None)
+        user_content = [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/{format};base64,{base64_str}",
+                    "detail": detail
                 },
-                {"type": "text", "text": user_prompt},
-            ],
-        }
-        output_messages.append(user_message)
+            },
+        ]
+        if user_prompt is not None:
+            user_content.append({"type": "text", "text": user_prompt})
+        output_messages.append({"role": "user", "content": user_content})
         return output_messages
 
 
@@ -211,49 +211,46 @@ class OpenAIVLMEngine(OpenAIInferenceEngine, VLMEngine):
         """
         base64_str = image_to_base64(image)
         output_messages = []
-        # system message
-        system_message = {"role": "system", "content": system_prompt}
-        output_messages.append(system_message)
+        # system message (omitted when system_prompt is None)
+        if system_prompt is not None:
+            output_messages.append({"role": "system", "content": system_prompt})
 
         # few-shot examples
         if few_shot_examples is not None:
             for example in few_shot_examples:
                 if not isinstance(example, FewShotExample):
                     raise ValueError("Few-shot example must be a FewShotExample object.")
-                
+
                 example_image_b64 = image_to_base64(example.image)
-                example_user_message = {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/{format};base64,{example_image_b64}",
-                                "detail": detail
-                            },
+                example_user_content = [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/{format};base64,{example_image_b64}",
+                            "detail": detail
                         },
-                        {"type": "text", "text": user_prompt},
-                    ],
-                }
+                    },
+                ]
+                if user_prompt is not None:
+                    example_user_content.append({"type": "text", "text": user_prompt})
+                example_user_message = {"role": "user", "content": example_user_content}
                 example_agent_message = {"role": "assistant", "content": example.text}
                 output_messages.append(example_user_message)
                 output_messages.append(example_agent_message)
 
-        # user message
-        user_message = {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/{format};base64,{base64_str}",
-                        "detail": detail
-                    },
+        # user message (text omitted when user_prompt is None)
+        user_content = [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/{format};base64,{base64_str}",
+                    "detail": detail
                 },
-                {"type": "text", "text": user_prompt},
-            ],
-        }
-        output_messages.append(user_message)
+            },
+        ]
+        if user_prompt is not None:
+            user_content.append({"type": "text", "text": user_prompt})
+        output_messages.append({"role": "user", "content": user_content})
         return output_messages
 
 

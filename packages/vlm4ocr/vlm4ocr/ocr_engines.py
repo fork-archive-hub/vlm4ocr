@@ -1,5 +1,5 @@
 import os
-from typing import Any, Tuple, List, Dict, Union, Generator, AsyncGenerator, Iterable
+from typing import Any, Tuple, List, Dict, Union, Generator, AsyncGenerator, Iterable, Literal
 import importlib
 import asyncio
 from colorama import Fore, Style   
@@ -12,7 +12,9 @@ SUPPORTED_IMAGE_EXTS = ['.pdf', '.tif', '.tiff', '.png', '.jpg', '.jpeg', '.bmp'
 
 
 class OCREngine:
-    def __init__(self, vlm_engine:VLMEngine, output_mode:str="markdown", system_prompt:str=None, user_prompt:str=None):
+    def __init__(self, vlm_engine:VLMEngine, output_mode:str="markdown",
+                 system_prompt:Union[str, None, Literal[False]]=None,
+                 user_prompt:Union[str, None, Literal[False]]=None):
         """
         This class inputs a image or PDF file path and processes them using a VLM inference engine. Outputs plain text or markdown.
 
@@ -22,10 +24,19 @@ class OCREngine:
             The inference engine to use for OCR.
         output_mode : str, Optional
             The output format. Must be 'markdown', 'HTML', 'text', or 'JSON'.
-        system_prompt : str, Optional
-            Custom system prompt. We recommend use a default system prompt by leaving this blank. 
-        user_prompt : str, Optional
-            Custom user prompt. It is good to include some information regarding the document. If not specified, a default will be used.
+        system_prompt : str | None | False, Optional
+            Controls the system prompt sent to the model.
+            - None (default): use the built-in default system prompt for the selected output_mode.
+            - str: use this custom system prompt.
+            - False: send no system prompt at all. Use this for OCR-specific models (e.g. PaddleOCR,
+              LightOn-OCR) that are not designed to accept a system prompt.
+        user_prompt : str | None | False, Optional
+            Controls the user-turn text sent alongside the image.
+            - None (default): use the built-in default user prompt for the selected output_mode.
+            - str: use this custom user prompt.
+            - False: send no user prompt text (image only). Use this for OCR-specific models that
+              do not accept a user prompt. Note: when output_mode is 'JSON', passing False bypasses
+              the JSON-structure requirement — the model must handle output formatting on its own.
         """
         # Check inference engine
         if not isinstance(vlm_engine, VLMEngine):
@@ -38,15 +49,21 @@ class OCREngine:
         self.output_mode = output_mode
 
         # System prompt
-        if isinstance(system_prompt, str) and system_prompt:
+        if system_prompt is False:
+            # Explicitly disabled — OCR-specific models that accept no system prompt
+            self.system_prompt = None
+        elif isinstance(system_prompt, str) and system_prompt:
             self.system_prompt = system_prompt
         else:
             prompt_template_path = importlib.resources.files('vlm4ocr.assets.default_prompt_templates').joinpath(f'ocr_{self.output_mode}_system_prompt.txt')
             with prompt_template_path.open('r', encoding='utf-8') as f:
-                self.system_prompt =  f.read()
+                self.system_prompt = f.read()
 
         # User prompt
-        if isinstance(user_prompt, str) and user_prompt:
+        if user_prompt is False:
+            # Explicitly disabled — OCR-specific models that accept no user prompt text
+            self.user_prompt = None
+        elif isinstance(user_prompt, str) and user_prompt:
             self.user_prompt = user_prompt
         else:
             if self.output_mode == "JSON":
@@ -54,7 +71,7 @@ class OCREngine:
 
             prompt_template_path = importlib.resources.files('vlm4ocr.assets.default_prompt_templates').joinpath(f'ocr_{self.output_mode}_user_prompt.txt')
             with prompt_template_path.open('r', encoding='utf-8') as f:
-                self.user_prompt =  f.read()
+                self.user_prompt = f.read()
 
         # Image processor
         self.image_processor = ImageProcessor()
