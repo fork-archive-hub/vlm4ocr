@@ -9,3 +9,4 @@ examples/
 doc_asset/
 nginx/certs/
 packages/
+services/web_app/temp/
