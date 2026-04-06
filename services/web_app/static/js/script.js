@@ -30,28 +30,36 @@ document.addEventListener('DOMContentLoaded', function () {
         updatePreviewIcon(currentOutputFormat);
     }
 
-    // --- Event Listener for Form Submission ---
+    // --- Event Listener for Form Submission (single file) ---
+    let singleOcrAbortController = null;
+    const originalSingleButtonText = runOcrButton.innerHTML;
+
     if (ocrForm) {
         ocrForm.addEventListener('submit', async function (event) {
             event.preventDefault();
+
+            // If already running, abort it
+            if (singleOcrAbortController) {
+                singleOcrAbortController.abort();
+                return;
+            }
+
             pageContentsArray = [];
-            const originalButtonText = runOcrButton.innerHTML;
-            setButtonState(runOcrButton, true, originalButtonText);
+            singleOcrAbortController = new AbortController();
+            setButtonState(runOcrButton, 'stop', originalSingleButtonText);
             displayProcessingMessage(ocrOutputArea);
             const formData = new FormData(ocrForm);
             currentOutputFormat = formData.get('output_format');
             updatePreviewIcon(currentOutputFormat);
             let streamStarted = false;
             try {
-                const response = await submitSingleOcr(formData);
+                const response = await submitSingleOcr(formData, singleOcrAbortController.signal);
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) {
-                        // --- THIS IS THE CRUCIAL FIX ---
-                        // Pass the toggle ELEMENT directly to the rendering function.
                         renderFinalOutput(pageContentsArray, currentOutputFormat, ocrOutputArea, ocrRenderToggle);
                         ocrToggleContainer.style.display = 'flex';
                         outputHeader.style.display = 'flex';
@@ -77,9 +85,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 }
             } catch (error) {
-                displayOcrError(error, ocrOutputArea);
+                if (error.name === 'AbortError') {
+                    ocrOutputArea.innerHTML = '<p class="ocr-status-message">Stopped.</p>';
+                } else {
+                    displayOcrError(error, ocrOutputArea);
+                }
             } finally {
-                setButtonState(runOcrButton, false, originalButtonText);
+                singleOcrAbortController = null;
+                setButtonState(runOcrButton, 'idle', originalSingleButtonText);
             }
         });
     }
@@ -111,22 +124,25 @@ document.addEventListener('DOMContentLoaded', function () {
     const batchInputFileListArea = document.getElementById('batch-input-file-list-area');
     const batchOutputFileListhArea = document.getElementById('batch-output-file-list-area');
     const runBatchOcrButton = document.getElementById('run-batch-ocr-button');
+    const originalBatchButtonText = runBatchOcrButton.innerHTML;
+
+    // Batch state
+    let batchEventSource = null;
+    let currentBatchId = null;
+    let isBatchRunning = false;
 
     // =================================================================
     // == Event Listeners for Batch Tab
     // =================================================================
 
-    // Listener for VLM API selection change in the batch tab
     if (batchVlmApiSelect) {
         batchVlmApiSelect.addEventListener('change', handleBatchVlmApiChange);
     }
 
-    // Listener for file input changes in the batch tab
     if (batchFileInput) {
         batchFileInput.addEventListener('change', updateBatchFileList);
     }
 
-    // Listener for the batch OCR form submission
     if (batchForm) {
         batchForm.addEventListener('submit', handleBatchFormSubmit);
     }
@@ -136,16 +152,47 @@ document.addEventListener('DOMContentLoaded', function () {
     // == Handler Functions for Batch Tab
     // =================================================================
 
+    function setBatchButtonState(state) {
+        if (state === 'uploading') {
+            runBatchOcrButton.disabled = true;
+            runBatchOcrButton.classList.remove('btn-stop');
+            runBatchOcrButton.innerHTML = 'Uploading...';
+        } else if (state === 'stop') {
+            isBatchRunning = true;
+            runBatchOcrButton.disabled = false;
+            runBatchOcrButton.classList.add('btn-stop');
+            runBatchOcrButton.innerHTML = 'Stop';
+        } else { // 'idle'
+            isBatchRunning = false;
+            runBatchOcrButton.disabled = false;
+            runBatchOcrButton.classList.remove('btn-stop');
+            runBatchOcrButton.innerHTML = originalBatchButtonText;
+        }
+    }
+
+    function stopBatchOcr() {
+        if (batchEventSource) {
+            batchEventSource.close();
+            batchEventSource = null;
+        }
+        if (currentBatchId) {
+            fetch(`/api/cancel_batch/${currentBatchId}`, { method: 'POST' });
+            currentBatchId = null;
+        }
+        setBatchButtonState('idle');
+        batchOutputFileListhArea.insertAdjacentHTML(
+            'beforeend',
+            '<p class="ocr-status-message">Stopped.</p>'
+        );
+    }
+
     /**
      * Shows/hides conditional input fields based on the selected VLM API for the batch form.
      */
     function handleBatchVlmApiChange() {
-        // Hide all conditional option divs
         document.querySelectorAll('#batch-ocr-form .conditional-options').forEach(div => {
             div.style.display = 'none';
         });
-
-        // Show the relevant div based on selection
         const selectedApi = batchVlmApiSelect.value;
         const optionsDiv = document.getElementById(`batch-${selectedApi}-options`);
         if (optionsDiv) {
@@ -153,22 +200,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    /**
-     * Updates the UI to display the list of selected files for the batch process.
-     * This version uses styled list-group containers for a cleaner look.
-     */
     function updateBatchFileList() {
         if (!batchInputFileListArea || !batchFileInput.files) return;
 
         const maxFiles = parseInt(batchFileInput.getAttribute('data-max-files'), 10) || 100;
         if (batchFileInput.files.length > maxFiles) {
             alert(`You can only select a maximum of ${maxFiles} files.`);
-            batchFileInput.value = ''; // Clear the selection
+            batchFileInput.value = '';
             batchInputFileListArea.innerHTML = '<p class="ocr-status-message">Please select files (up to ' + maxFiles + ').</p>';
             return;
         }
 
-        batchInputFileListArea.innerHTML = ''; // Clear previous list
+        batchInputFileListArea.innerHTML = '';
 
         if (batchFileInput.files.length === 0) {
             batchInputFileListArea.innerHTML = '<p class="ocr-status-message">Uploaded files will be listed here.</p>';
@@ -176,15 +219,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const list = document.createElement('div');
-        list.className = 'list-group'; // Use a div with a list-group class
+        list.className = 'list-group';
 
         for (const file of batchFileInput.files) {
             const listItem = document.createElement('div');
-            listItem.className = 'list-group-item'; // Each file is a list-group-item
-
+            listItem.className = 'list-group-item';
             const icon = document.createElement('i');
-            icon.className = 'fas fa-file-alt me-2'; // Font Awesome file icon
-            
+            icon.className = 'fas fa-file-alt me-2';
             listItem.appendChild(icon);
             listItem.appendChild(document.createTextNode(` ${file.name}`));
             list.appendChild(listItem);
@@ -194,12 +235,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /**
      * Handles the submission of the batch OCR form.
-     * This now uses a two-step process:
-     * 1. POSTs the form data to get a unique batch ID.
-     * 2. Uses that ID to open a GET EventSource connection for streaming results.
+     * Two-step: POST to get batch_id, then GET EventSource for streaming results.
      */
     function handleBatchFormSubmit(event) {
-        event.preventDefault(); // Prevent the default form submission
+        event.preventDefault();
+
+        // If already running, stop it
+        if (isBatchRunning) {
+            stopBatchOcr();
+            return;
+        }
 
         const formData = new FormData(batchForm);
         const totalFiles = batchFileInput.files.length;
@@ -209,12 +254,9 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // --- UI Updates for Processing ---
-        runBatchOcrButton.disabled = true;
-        runBatchOcrButton.textContent = 'Uploading...';
+        setBatchButtonState('uploading');
         batchOutputFileListhArea.innerHTML = '<p class="ocr-status-message">Uploading files and initiating batch job...</p>';
 
-        // --- Step 1: Initiate the batch job via POST ---
         fetch('/api/initiate_batch_ocr', {
             method: 'POST',
             body: formData,
@@ -227,11 +269,9 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(data => {
             if (data.status === 'success' && data.batch_id) {
-                // --- UI Update ---
-                runBatchOcrButton.textContent = 'Processing...';
+                currentBatchId = data.batch_id;
+                setBatchButtonState('stop');
                 batchOutputFileListhArea.innerHTML = '<p class="ocr-status-message">Processing... waiting for first file to complete.</p>';
-                
-                // --- Step 2: Start streaming results via GET ---
                 startStreamingResults(data.batch_id);
             } else {
                 throw new Error(data.error || 'Failed to initiate batch job.');
@@ -240,8 +280,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .catch(err => {
             console.error("Failed to initiate batch OCR:", err);
             batchOutputFileListhArea.innerHTML = `<p class="ocr-status-message text-danger">Error: ${err.message}</p>`;
-            runBatchOcrButton.disabled = false;
-            runBatchOcrButton.textContent = 'Run Batch OCR';
+            setBatchButtonState('idle');
         });
     }
 
@@ -250,14 +289,12 @@ document.addEventListener('DOMContentLoaded', function () {
      * @param {string} batchId - The unique ID for the batch job.
      */
     function startStreamingResults(batchId) {
-        const eventSource = new EventSource(`/api/stream_batch_results/${batchId}`);
+        batchEventSource = new EventSource(`/api/stream_batch_results/${batchId}`);
         let processedFiles = 0;
 
-        // --- SSE Message Handler ---
-        eventSource.onmessage = function(e) {
+        batchEventSource.onmessage = function(e) {
             const message = JSON.parse(e.data);
 
-            // Create the list container on the first valid message
             if (processedFiles === 0 && message.type !== 'completed') {
                 batchOutputFileListhArea.innerHTML = '';
                 const list = document.createElement('div');
@@ -288,17 +325,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 errorItem.appendChild(icon);
                 errorItem.appendChild(document.createTextNode(` Error: ${message.filename || 'a file'} - ${message.data}`));
                 outputListGroup.appendChild(errorItem);
-            
-            } else if (message.type === 'completed') {
-                // --- THIS IS THE COMPLETED LOGIC ---
-                // 1. Gracefully close the connection from the client side
-                eventSource.close();
-                
-                // 2. Re-enable the run button
-                runBatchOcrButton.disabled = false;
-                runBatchOcrButton.textContent = 'Run Batch OCR';
 
-                // 3. Enable the "Download All" button
+            } else if (message.type === 'completed') {
+                batchEventSource.close();
+                batchEventSource = null;
+                currentBatchId = null;
+                setBatchButtonState('idle');
+
                 const downloadAllLink = document.getElementById('batch-download-all-button');
                 downloadAllLink.href = `/api/download_batch_zip/${message.batch_id}`;
                 downloadAllLink.classList.remove('btn-disabled');
@@ -306,19 +339,20 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
-        // --- SSE Error Handler ---
-        eventSource.onerror = function(err) {
+        batchEventSource.onerror = function(err) {
             console.error("EventSource failed:", err);
-            eventSource.close(); // Always close on error
-            runBatchOcrButton.disabled = false;
-            runBatchOcrButton.textContent = 'Run Batch OCR';
-            
-            // Avoid adding a duplicate error message if one already exists
-            if (!document.querySelector('#batch-output-list-group .list-group-item-danger')) {
-                const errorPara = document.createElement('p');
-                errorPara.className = 'ocr-status-message text-danger';
-                errorPara.textContent = 'A connection error occurred. Please check the server logs and try again.';
-                batchOutputFileListhArea.appendChild(errorPara);
+            // Only handle as error if we didn't intentionally stop
+            if (batchEventSource) {
+                batchEventSource.close();
+                batchEventSource = null;
+                currentBatchId = null;
+                setBatchButtonState('idle');
+                if (!document.querySelector('#batch-output-list-group .list-group-item-danger')) {
+                    const errorPara = document.createElement('p');
+                    errorPara.className = 'ocr-status-message text-danger';
+                    errorPara.textContent = 'A connection error occurred. Please check the server logs and try again.';
+                    batchOutputFileListhArea.appendChild(errorPara);
+                }
             }
         };
     }

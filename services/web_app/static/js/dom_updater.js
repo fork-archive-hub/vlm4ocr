@@ -5,9 +5,16 @@
 let pageContentHosts = {};
 let currentPageCounter = 0;
 
-function setButtonState(button, isLoading, originalText) {
-    button.disabled = isLoading;
-    button.innerHTML = isLoading ? '<span class="spinner"></span> Processing...' : originalText;
+function setButtonState(button, state, originalText) {
+    if (state === 'stop') {
+        button.disabled = false;
+        button.classList.add('btn-stop');
+        button.innerHTML = 'Stop';
+    } else { // 'idle'
+        button.disabled = false;
+        button.classList.remove('btn-stop');
+        button.innerHTML = originalText;
+    }
 }
 
 function displayProcessingMessage(outputArea) {

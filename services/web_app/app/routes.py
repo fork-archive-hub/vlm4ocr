@@ -96,6 +96,13 @@ def handle_stream_batch_results(batch_id):
     return Response(stream_with_context(generate_events()), mimetype='text/event-stream')
 
 
+@app.route('/api/cancel_batch/<batch_id>', methods=['POST'])
+def handle_cancel_batch(batch_id):
+    """Signals the batch worker thread to stop processing."""
+    app_services.cancel_batch_job(batch_id)
+    return jsonify({'status': 'cancelled'}), 200
+
+
 @app.route('/api/download_file/<batch_id>/<filename>', methods=['GET'])
 def download_file(batch_id, filename):
     """

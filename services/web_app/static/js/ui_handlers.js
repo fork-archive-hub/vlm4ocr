@@ -53,15 +53,62 @@ function initializeFilePreviewHandlers() {
     const dropZone = document.querySelector('#single-file-pane .file-drop-zone');
     const dropZoneText = dropZone ? dropZone.querySelector('.drop-zone-text') : null;
     const previewArea = document.getElementById('input-preview-area');
+    const previewContentWrapper = document.getElementById('preview-content-wrapper');
 
     let currentPreviewUrl = null; // For revoking image object URLs
 
-    if (!fileInput || !dropZone || !previewArea) {
+    if (!fileInput || !dropZone || !previewArea || !previewContentWrapper) {
         console.error("File preview initialization failed: one or more required elements not found.");
         return;
     }
 
-    // --- RENDER FUNCTIONS (Restored from original script) ---
+    // --- ZOOM STATE ---
+    let zoomLevel = 1.0;
+    const ZOOM_STEP = 0.25;
+    const ZOOM_MIN = 0.25;
+    const ZOOM_MAX = 4.0;
+
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const zoomResetBtn = document.getElementById('zoom-reset-btn');
+    const zoomLevelDisplay = document.getElementById('zoom-level-display');
+
+    function applyZoom() {
+        // Set wrapper width so max-width:100% children (img/canvas) scale with it.
+        // Zoom > 1 makes wrapper wider than scroll container, triggering horizontal scrollbar.
+        previewContentWrapper.style.width = (zoomLevel * 100) + '%';
+        if (zoomLevelDisplay) zoomLevelDisplay.textContent = Math.round(zoomLevel * 100) + '%';
+    }
+
+    if (zoomInBtn) {
+        zoomInBtn.addEventListener('click', () => {
+            zoomLevel = Math.min(ZOOM_MAX, parseFloat((zoomLevel + ZOOM_STEP).toFixed(2)));
+            applyZoom();
+        });
+    }
+    if (zoomOutBtn) {
+        zoomOutBtn.addEventListener('click', () => {
+            zoomLevel = Math.max(ZOOM_MIN, parseFloat((zoomLevel - ZOOM_STEP).toFixed(2)));
+            applyZoom();
+        });
+    }
+    if (zoomResetBtn) {
+        zoomResetBtn.addEventListener('click', () => {
+            zoomLevel = 1.0;
+            applyZoom();
+        });
+    }
+
+    // Ctrl+scroll to zoom
+    previewArea.addEventListener('wheel', (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+        zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, parseFloat((zoomLevel + delta).toFixed(2))));
+        applyZoom();
+    }, { passive: false });
+
+    // --- RENDER FUNCTIONS ---
 
     /**
      * Renders a preview for standard image types (PNG, JPEG, etc.).
@@ -71,15 +118,15 @@ function initializeFilePreviewHandlers() {
             URL.revokeObjectURL(currentPreviewUrl);
         }
         const img = document.createElement('img');
-        img.style.cssText = 'max-width:100%; max-height:100%; display:block; margin:auto;';
+        img.style.cssText = 'max-width:100%; height:auto; display:block; margin:auto;';
         currentPreviewUrl = URL.createObjectURL(file);
         img.src = currentPreviewUrl;
         img.onload = () => {
-            previewArea.innerHTML = '';
-            previewArea.appendChild(img);
+            previewContentWrapper.innerHTML = '';
+            previewContentWrapper.appendChild(img);
         };
         img.onerror = () => {
-            previewArea.innerHTML = '<p class="ocr-status-message ocr-status-error">Could not preview image.</p>';
+            previewContentWrapper.innerHTML = '<p class="ocr-status-message ocr-status-error">Could not preview image.</p>';
             URL.revokeObjectURL(currentPreviewUrl);
             currentPreviewUrl = null;
         };
@@ -90,10 +137,9 @@ function initializeFilePreviewHandlers() {
      */
     async function renderPdfPreview(file) {
         if (typeof pdfjsLib === 'undefined') {
-            previewArea.innerHTML = '<p class="ocr-status-message ocr-status-error">PDF Viewer library (PDF.js) is not loaded.</p>';
+            previewContentWrapper.innerHTML = '<p class="ocr-status-message ocr-status-error">PDF Viewer library (PDF.js) is not loaded.</p>';
             return;
         }
-        // Ensure any old image object URL is cleaned up
         if (currentPreviewUrl) {
             URL.revokeObjectURL(currentPreviewUrl);
             currentPreviewUrl = null;
@@ -103,7 +149,7 @@ function initializeFilePreviewHandlers() {
             try {
                 const typedarray = new Uint8Array(this.result);
                 const pdfDoc = await pdfjsLib.getDocument({ data: typedarray }).promise;
-                previewArea.innerHTML = ''; // Clear loading message
+                previewContentWrapper.innerHTML = '';
                 for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
                     const page = await pdfDoc.getPage(pageNum);
                     const viewport = page.getViewport({ scale: 1.5 });
@@ -111,13 +157,13 @@ function initializeFilePreviewHandlers() {
                     const context = canvas.getContext('2d');
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
-                    canvas.style.cssText = 'display: block; margin-bottom: 10px; max-width: 100%; border: 1px solid #ccc;';
-                    previewArea.appendChild(canvas);
+                    canvas.style.cssText = 'display: block; margin-bottom: 10px; width: 100%; height: auto; border: 1px solid #ccc;';
+                    previewContentWrapper.appendChild(canvas);
                     await page.render({ canvasContext: context, viewport: viewport }).promise;
                 }
             } catch (error) {
                 console.error("PDF preview error:", error);
-                previewArea.innerHTML = `<p class="ocr-status-message ocr-status-error">Error rendering PDF preview: ${error.message}</p>`;
+                previewContentWrapper.innerHTML = `<p class="ocr-status-message ocr-status-error">Error rendering PDF preview: ${error.message}</p>`;
             }
         };
         fileReader.readAsArrayBuffer(file);
@@ -127,7 +173,6 @@ function initializeFilePreviewHandlers() {
      * Fetches and renders a preview for a TIFF file by converting it on the server.
      */
     async function renderTiffPreview(file) {
-        // Ensure any old image object URL is cleaned up
         if (currentPreviewUrl) {
             URL.revokeObjectURL(currentPreviewUrl);
             currentPreviewUrl = null;
@@ -141,43 +186,41 @@ function initializeFilePreviewHandlers() {
                 throw new Error(errorData.error);
             }
             const result = await response.json();
-            previewArea.innerHTML = ''; // Clear loading message
+            previewContentWrapper.innerHTML = '';
             if (result.status === 'success' && result.pages_data) {
                 result.pages_data.forEach(base64Data => {
                     const img = document.createElement('img');
                     img.style.cssText = 'display: block; margin-bottom: 10px; max-width: 100%; border: 1px solid #ccc;';
                     img.src = `data:image/png;base64,${base64Data}`;
-                    previewArea.appendChild(img);
+                    previewContentWrapper.appendChild(img);
                 });
             } else {
                 throw new Error(result.error || 'TIFF conversion failed on server.');
             }
         } catch (error) {
             console.error("TIFF preview error:", error);
-            previewArea.innerHTML = `<p class="ocr-status-message ocr-status-error">Error rendering TIFF preview: ${error.message}</p>`;
+            previewContentWrapper.innerHTML = `<p class="ocr-status-message ocr-status-error">Error rendering TIFF preview: ${error.message}</p>`;
         }
     }
-
 
     /**
      * Orchestrates the display of a file preview based on its type.
      */
     function displayPreview(file) {
-        previewArea.innerHTML = '';
+        previewContentWrapper.innerHTML = '';
         if (!file) {
-            previewArea.innerHTML = '<p class="ocr-status-message" style="color:#ccc;">Upload a file to see a preview</p>';
+            previewContentWrapper.innerHTML = '<p class="ocr-status-message" style="color:#ccc;">Upload a file to see a preview</p>';
             if (currentPreviewUrl) {
                 URL.revokeObjectURL(currentPreviewUrl);
                 currentPreviewUrl = null;
             }
             return;
         }
-        previewArea.innerHTML = '<p class="ocr-status-message ocr-status-processing">Loading preview...</p>';
+        previewContentWrapper.innerHTML = '<p class="ocr-status-message ocr-status-processing">Loading preview...</p>';
 
         const fileType = file.type;
         const fileName = file.name.toLowerCase();
 
-        // --- THIS IS THE RESTORED LOGIC ---
         if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
             renderPdfPreview(file);
         } else if (fileType === 'image/tiff' || fileName.endsWith('.tiff') || fileName.endsWith('.tif')) {
@@ -185,7 +228,7 @@ function initializeFilePreviewHandlers() {
         } else if (fileType.startsWith('image/')) {
             renderImagePreview(file);
         } else {
-            previewArea.innerHTML = `<p class="ocr-status-message">Preview for this file type is not supported.</p>`;
+            previewContentWrapper.innerHTML = `<p class="ocr-status-message">Preview for this file type is not supported.</p>`;
             if (currentPreviewUrl) {
                 URL.revokeObjectURL(currentPreviewUrl);
                 currentPreviewUrl = null;
@@ -194,7 +237,7 @@ function initializeFilePreviewHandlers() {
     }
 
     // --- Event Listeners ---
-    
+
     // Drag and Drop Listeners
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, e => {
@@ -212,7 +255,7 @@ function initializeFilePreviewHandlers() {
     dropZone.addEventListener('drop', (e) => {
         const droppedFile = e.dataTransfer.files[0];
         if (droppedFile) {
-            fileInput.files = e.dataTransfer.files; // Assign file to the input
+            fileInput.files = e.dataTransfer.files;
             dropZoneText.textContent = `Selected: ${droppedFile.name}`;
             displayPreview(droppedFile);
         }

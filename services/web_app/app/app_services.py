@@ -215,12 +215,24 @@ def initiate_batch_job(request):
     return batch_id
 
 
+# Maps batch_id -> threading.Event; set the event to cancel that batch job
+_batch_cancel_events: dict = {}
+
+
+def cancel_batch_job(batch_id: str):
+    event = _batch_cancel_events.get(batch_id)
+    if event:
+        event.set()
+
+
 def process_batch_ocr_stream(batch_id, base_url):
     """
     Finds a batch job by its ID, processes it, and streams results.
     This function now correctly handles URL generation in the main thread.
     """
     q = queue.Queue()
+    cancel_event = threading.Event()
+    _batch_cancel_events[batch_id] = cancel_event
     # Get a safe reference to the current Flask app object
     app = current_app._get_current_object()
 
@@ -251,24 +263,27 @@ def process_batch_ocr_stream(batch_id, base_url):
                 output_format_ext = output_format_ext_map.get(output_format, 'md')
                 image_paths = [str(p) for p in batch_dir.iterdir() if p.is_file() and p.suffix.lower() not in ['.json']]
 
-                async def process_and_queue_results(concurrent_batch_size:int):
+                async def process_and_queue_results(concurrent_batch_size: int):
                     """The async coroutine that calls the OCR library."""
                     response_generator = ocr_engine.concurrent_ocr(
-                        file_paths=image_paths, 
+                        file_paths=image_paths,
                         concurrent_batch_size=concurrent_batch_size
                     )
-                    async for result in response_generator:
-                        if result.status == "success":
-                            output_filename = f"{Path(result.filename).stem}.{output_format_ext}"
-                            output_content = result.to_string()
-                            with open(batch_dir / output_filename, "w", encoding="utf-8") as f:
-                                f.write(output_content)
-                            
-                            # The worker only sends back the filename for successful results
-                            q.put(json.dumps({'type': 'result', 'filename': output_filename}))
-                        else:
-                            error_data = getattr(result, 'error_message', 'Unknown error.')
-                            q.put(json.dumps({'type': 'error', 'filename': Path(result.filename).name, 'data': error_data}))
+                    try:
+                        async for result in response_generator:
+                            if cancel_event.is_set():
+                                break
+                            if result.status == "success":
+                                output_filename = f"{Path(result.filename).stem}.{output_format_ext}"
+                                output_content = result.to_string()
+                                with open(batch_dir / output_filename, "w", encoding="utf-8") as f:
+                                    f.write(output_content)
+                                q.put(json.dumps({'type': 'result', 'filename': output_filename}))
+                            else:
+                                error_data = getattr(result, 'error_message', 'Unknown error.')
+                                q.put(json.dumps({'type': 'error', 'filename': Path(result.filename).name, 'data': error_data}))
+                    finally:
+                        await response_generator.aclose()
 
                 batch_processing_config = current_app.config.get("batch_processing", {})
                 concurrent_batch_size = batch_processing_config.get("concurrent_batch_size", 4)
@@ -280,7 +295,8 @@ def process_batch_ocr_stream(batch_id, base_url):
                 error_trace = traceback.format_exc()
                 q.put(json.dumps({'type': 'error', 'data': f'A critical server error occurred:\n{error_trace}'}))
             finally:
-                q.put(None) # Sentinel value to signal completion
+                _batch_cancel_events.pop(batch_id, None)
+                q.put(None)  # Sentinel value to signal completion
 
     # The base_url is NOT passed to the worker thread
     thread = threading.Thread(target=run_async_ocr_worker)
@@ -290,15 +306,15 @@ def process_batch_ocr_stream(batch_id, base_url):
     while True:
         message_json = q.get()
         if message_json is None:
-            yield json.dumps({'type': 'completed', 'batch_id': batch_id})
+            if not cancel_event.is_set():
+                yield json.dumps({'type': 'completed', 'batch_id': batch_id})
             break
 
         message = json.loads(message_json)
-        
+
         # If the message is a successful result, build the URL here
         if message['type'] == 'result':
             relative_url = url_for('download_file', batch_id=batch_id, filename=message['filename'])
-            # Combine the base_url from the initial request with the new relative_url
             download_url = f"{base_url.rstrip('/')}{relative_url}"
             message['download_url'] = download_url
             yield json.dumps(message)

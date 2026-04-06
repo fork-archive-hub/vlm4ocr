@@ -20,10 +20,11 @@ async function getOCR() {
  * @param {FormData} formData - The form data to submit.
  * @returns {Promise<Response>} A promise that resolves to the raw Response object.
  */
-async function submitSingleOcr(formData) {
+async function submitSingleOcr(formData, signal) {
     const response = await fetch('/api/run_ocr', {
         method: 'POST',
         body: formData,
+        signal: signal,
     });
 
     if (!response.ok) {
