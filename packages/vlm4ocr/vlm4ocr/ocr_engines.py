@@ -405,22 +405,31 @@ class OCREngine:
         concurrent_batch_size controls how many VLM calls are made concurrently.
         """
         vlm_call_semaphore = asyncio.Semaphore(concurrent_batch_size)
-        file_load_semaphore = asyncio.Semaphore(max_file_load) 
+        file_load_semaphore = asyncio.Semaphore(max_file_load)
 
         tasks = []
         for file_path in file_paths:
-            task = self._ocr_file_with_semaphore(file_load_semaphore=file_load_semaphore, 
-                                                 vlm_call_semaphore=vlm_call_semaphore, 
-                                                 file_path=file_path, 
-                                                 rotate_correction=rotate_correction,
-                                                 max_dimension_pixels=max_dimension_pixels,
-                                                 few_shot_examples=few_shot_examples)
+            task = asyncio.ensure_future(
+                self._ocr_file_with_semaphore(file_load_semaphore=file_load_semaphore,
+                                              vlm_call_semaphore=vlm_call_semaphore,
+                                              file_path=file_path,
+                                              rotate_correction=rotate_correction,
+                                              max_dimension_pixels=max_dimension_pixels,
+                                              few_shot_examples=few_shot_examples)
+            )
             tasks.append(task)
 
-        
-        for future in asyncio.as_completed(tasks):
-            result: OCRResult = await future
-            yield result
+        try:
+            for future in asyncio.as_completed(tasks):
+                result: OCRResult = await future
+                yield result
+        finally:
+            # Cancel any tasks still running when the consumer stops iterating
+            # (e.g. break, exception, aclose(), or Ctrl+C)
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
         
     async def _ocr_file_with_semaphore(self, file_load_semaphore:asyncio.Semaphore, vlm_call_semaphore:asyncio.Semaphore, 
                                        file_path:str, rotate_correction:bool=False, max_dimension_pixels:int=None,
@@ -469,10 +478,20 @@ class OCREngine:
                     page_processing_tasks.append(task)
                 
                 if page_processing_tasks:
-                    processed_page_results = await asyncio.gather(*page_processing_tasks)
-                    for text, image_processing_status in processed_page_results:
-                        result.add_page(text=text, image_processing_status=image_processing_status)
+                    page_tasks = [asyncio.ensure_future(t) for t in page_processing_tasks]
+                    try:
+                        processed_page_results = await asyncio.gather(*page_tasks)
+                        for text, image_processing_status in processed_page_results:
+                            result.add_page(text=text, image_processing_status=image_processing_status)
+                    except asyncio.CancelledError:
+                        for pt in page_tasks:
+                            if not pt.done():
+                                pt.cancel()
+                        await asyncio.gather(*page_tasks, return_exceptions=True)
+                        raise
 
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 result.status = "error"
                 result.add_page(text=f"Error during OCR for {filename}: {str(e)}", image_processing_status={})
