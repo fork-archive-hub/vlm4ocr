@@ -1,8 +1,12 @@
 import os
-from typing import List, Dict, Literal
+from typing import List, Dict, Literal, Optional, Union, TYPE_CHECKING
 from PIL import Image
 from dataclasses import dataclass, field
-from vlm4ocr.utils import get_default_page_delimiter, ImageProcessor
+from vlm4ocr.utils import get_default_page_delimiter
+from vlm4ocr.preprocessing import ImageProcessor, RotateCorrectionMethod
+
+if TYPE_CHECKING:
+    from vlm4ocr.vlm_engines import VLMEngine
 
 OutputMode = Literal["markdown", "HTML", "text", "JSON"]
 
@@ -121,7 +125,7 @@ class OCRResult:
 
         return self.page_delimiter.join([page.get("text", "") for page in self.pages])
     
-@dataclass    
+@dataclass
 class FewShotExample:
     """
     This class represents a few-shot example for OCR tasks.
@@ -132,27 +136,34 @@ class FewShotExample:
         The image associated with the example.
     text : str
         The expected OCR result text for the image.
-    rotate_correction : bool, Optional
-        If True, applies rotate correction to the images using pytesseract.
+    rotate_correction : {"tesseract", "vlm", False}, Optional
+        Rotation correction method applied at construction time. "tesseract" uses pytesseract OSD;
+        "vlm" prompts the provided vlm_engine. False disables correction.
+    vlm_engine : VLMEngine, Optional
+        Required when rotate_correction="vlm".
     max_dimension_pixels : int, Optional
         The maximum dimension of the image in pixels. Original dimensions will be resized to fit in. If None, no resizing is applied.
     """
     image: Image.Image
     text: str
-    rotate_correction: bool = False
+    rotate_correction: Union[RotateCorrectionMethod, Literal[False]] = False
+    vlm_engine: Optional["VLMEngine"] = None
     max_dimension_pixels: int = None
     def __post_init__(self):
         if not isinstance(self.image, Image.Image):
             raise ValueError("image must be a PIL.Image.Image object")
         if not isinstance(self.text, str):
             raise ValueError("text must be a string")
-        
+
+        if self.rotate_correction == "vlm" and self.vlm_engine is None:
+            raise ValueError("vlm_engine is required when rotate_correction='vlm'.")
+
         if self.rotate_correction or self.max_dimension_pixels is not None:
-            self.image_processor = ImageProcessor()
+            self.image_processor = ImageProcessor(vlm_engine=self.vlm_engine)
 
         # Rotate correction if specified
         if self.rotate_correction:
-            self.image, _ = self.image_processor.rotate_correction(self.image)
+            self.image, _ = self.image_processor.rotate_correction(self.image, method=self.rotate_correction)
 
         # Resize image if max_dimension_pixels is specified
         if self.max_dimension_pixels is not None:

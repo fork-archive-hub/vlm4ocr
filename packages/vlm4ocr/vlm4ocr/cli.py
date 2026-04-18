@@ -95,8 +95,9 @@ def main():
     image_processing_group = parser.add_argument_group("Image Processing Parameters")
     image_processing_group.add_argument(
         "--rotate_correction",
-        action="store_true",
-        help="Enable automatic rotation correction for input images. This requires Tesseract OCR to be installed and configured correctly.")
+        choices=["tesseract", "vlm"],
+        default=None,
+        help="Rotation correction method for input images. 'tesseract' requires Tesseract OCR to be installed. 'vlm' prompts the configured VLM engine. Omit to disable.")
     image_processing_group.add_argument(
         "--max_dimension_pixels",
         type=int,
@@ -309,7 +310,7 @@ def main():
         async def process_and_write_concurrently():
             ocr_task_generator = ocr_engine_instance.concurrent_ocr(
                 file_paths=input_files_to_process,
-                rotate_correction=args.rotate_correction,
+                rotate_correction=args.rotate_correction or False,
                 max_dimension_pixels=args.max_dimension_pixels,
                 concurrent_batch_size=args.concurrent_batch_size,
                 max_file_load=args.max_file_load if args.max_file_load > 0 else None
