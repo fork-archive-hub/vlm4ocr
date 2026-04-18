@@ -7,7 +7,7 @@ Vision Language Models (VLMs) for Optical Character Recognition (OCR).
 | Feature                 | Support                                                                 |
 | :---------------------- | :---------------------------------------------------------------------- |
 | **File Types** | :white_check_mark: PDF, TIFF, PNG, JPG/JPEG, BMP, GIF, WEBP         |
-| **VLM Engines** | :white_check_mark: Ollama, OpenAI Compatible, OpenAI, Azure OpenAI |
+| **VLM Engines** | :white_check_mark: Ollama, OpenAI Compatible (vLLM, SGLang, OpenRouter), OpenAI, Azure OpenAI |
 | **Output Modes** | :white_check_mark: Markdown, HTML, plain text |
 | **Batch OCR** | :white_check_mark: Processes many files concurrently with Python, CLI, and web app |
 
@@ -24,6 +24,12 @@ Vision Language Models (VLMs) for Optical Character Recognition (OCR).
   - **Added OpenAICompatible VLM engines**: Separated the OpenAI compatible VLM engines into a parent class `OpenAICompatibleVLMEngine`.
 - [v0.4.0](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.4.0) (Dec 15, 2025):
   - **Few-shot examples**: Added support for few-shot examples to improve OCR accuracy.
+- [v0.4.3](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.4.3):
+  - **SGLang support**: Added `SGLangVLMEngine` for serving VLMs with SGLang.
+  - **Optional prompts**: `OCREngine` now accepts `system_prompt=False` / `user_prompt=False` for models that don't need them (e.g., PaddleOCR, LightOn-OCR).
+  - **Graceful shutdown**: `concurrent_ocr()` cancels in-flight VLM calls when the consumer stops iterating. CLI Ctrl+C and the web app Stop button now abort cleanly.
+- [v0.4.4](https://github.com/daviden1013/vlm4ocr/releases/tag/v0.4.4):
+  - **VLM-based rotation correction**: `rotate_correction` now accepts `"tesseract"`, `"vlm"`, or `False`. Use `"vlm"` when Tesseract isn't installed or struggles with noisy scans.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -210,6 +216,9 @@ ocr_results = ocr.sequential_ocr(pdf_path, verbose=True)
 # OCR for multiple image and pdf files
 ocr_results = ocr.sequential_ocr([pdf_path, image_path], verbose=True)
 
+# Auto-correct page rotation before OCR — "tesseract" uses Tesseract OSD, "vlm" reuses the OCR engine's VLM
+ocr_results = ocr.sequential_ocr(image_path, rotate_correction="vlm", verbose=True)
+
 # Inspect OCR results
 len(ocr_results) # 2 files
 ocr_results[0].input_dir
@@ -242,7 +251,7 @@ from vlm4ocr import FewShotExample, VLLMVLMEngine, OCREngine
 
 # Load few-shot examples
 # Note that the example text should be the expected OCR output for the example image. Do not include any extra instructions.
-example_1_image = Image.open("example_1.JPG"))
+example_1_image = Image.open("example_1.JPG")
 with open("example_1.txt", "r") as f:
     example_1_text = f.read()
 
