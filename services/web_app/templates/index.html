@@ -36,6 +36,7 @@
                             <option value="text">Plain text</option>
                             <option value="markdown" selected>Markdown</option>
                             <option value="HTML">HTML</option>
+                            <option value="JSON">JSON</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -101,11 +102,11 @@
                     </div>
                     <!-- End Conditional Options -->
 
-                    <details class="form-group">
+                    <details id="single-advanced-settings" class="form-group">
                         <summary style="cursor: pointer; font-weight: bold; margin-bottom: 10px;">Advanced OCR Settings</summary>
                         <div class="indented-option">
                             <div class="form-group">
-                                <label for="ocr-user-prompt">User Prompt (Optional Context):</label>
+                                <label for="ocr-user-prompt">User Prompt <span id="single-user-prompt-required" class="json-required-hint" style="display:none;">(Required for JSON — describe the output schema)</span><span id="single-user-prompt-optional" class="json-optional-hint">(Optional Context)</span>:</label>
                                 <textarea id="ocr-user-prompt" name="user_prompt" rows="3" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
                             </div>
                             <div class="form-group">
@@ -197,6 +198,7 @@
                             <option value="text">Plain text</option>
                             <option value="markdown" selected>Markdown</option>
                             <option value="HTML">HTML</option>
+                            <option value="JSON">JSON</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -259,11 +261,11 @@
                             <input type="text" id="batch-ollama-model" name="ollama_model" placeholder="Enter Ollama model name (e.g., llama3.2-vision)" class="api-input">
                         </div>
                     </div>
-                    <details class="form-group">
+                    <details id="batch-advanced-settings" class="form-group">
                         <summary style="cursor: pointer; font-weight: bold; margin-bottom: 10px;">Advanced OCR Settings</summary>
                         <div class="indented-option">
                             <div class="form-group">
-                                <label for="batch-ocr-user-prompt">User Prompt (Optional Context):</label>
+                                <label for="batch-ocr-user-prompt">User Prompt <span id="batch-user-prompt-required" class="json-required-hint" style="display:none;">(Required for JSON — describe the output schema)</span><span id="batch-user-prompt-optional" class="json-optional-hint">(Optional Context)</span>:</label>
                                 <textarea id="batch-ocr-user-prompt" name="user_prompt" rows="3" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
                             </div>
                             <div class="form-group">

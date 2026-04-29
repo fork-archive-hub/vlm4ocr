@@ -258,7 +258,7 @@ def process_batch_ocr_stream(batch_id, base_url):
                     form_data = json.load(f)
 
                 ocr_engine = _initialize_ocr_engine(form_data)
-                output_format_ext_map = {"text": "txt", "markdown": "md", "HTML": "html"}
+                output_format_ext_map = {"text": "txt", "markdown": "md", "HTML": "html", "JSON": "json"}
                 output_format = form_data.get('output_format', 'markdown')
                 output_format_ext = output_format_ext_map.get(output_format, 'md')
                 image_paths = [str(p) for p in batch_dir.iterdir() if p.is_file() and p.suffix.lower() not in ['.json']]
@@ -351,7 +351,7 @@ def download_batch_as_zip(batch_id):
     directory = Path(current_app.config["temp_directory"]) / str(batch_id)
     memory_file = io.BytesIO()
     
-    output_extensions = ('.md', '.txt', '.html')
+    output_extensions = ('.md', '.txt', '.html', '.json')
 
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
         for f in directory.iterdir():

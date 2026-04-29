@@ -833,3 +833,27 @@ a.list-group-item-action:hover {
 .custom-button:active {
     transform: scale(0.98);
 }
+
+/* JSON output hints */
+.json-required-hint {
+    color: #e74c3c;
+    font-weight: normal;
+    font-size: 0.85em;
+}
+
+.json-optional-hint {
+    font-weight: normal;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+
+/* JSON syntax highlight block */
+pre:has(code.language-json) {
+    background: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 4px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 0.875em;
+    margin-bottom: 10px;
+}

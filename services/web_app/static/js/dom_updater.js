@@ -38,6 +38,8 @@ function updatePreviewIcon(format) {
         iconClass = 'fa-code'; title = 'HTML Preview'; lib = 'fas';
     } else if (format.toLowerCase() === 'text') {
         iconClass = 'fa-file-alt'; title = 'Text Preview'; lib = 'fas';
+    } else if (format.toLowerCase() === 'json') {
+        iconClass = 'fa-brackets-curly'; title = 'JSON Preview'; lib = 'fas';
     }
     previewIcon.className = `${lib} ${iconClass}`;
     previewIcon.title = title;
@@ -67,6 +69,10 @@ function getOrCreatePageHost(outputArea, outputFormat) {
     } else if (format === 'markdown') {
         newHost = document.createElement('div');
         newHost.className = 'ocr-markdown-content';
+        pageWrapper.appendChild(newHost);
+    } else if (format === 'json') {
+        newHost = document.createElement('pre');
+        newHost.className = 'ocr-plaintext-content ocr-json-streaming';
         pageWrapper.appendChild(newHost);
     } else {
         newHost = document.createElement('pre');
@@ -166,6 +172,44 @@ function renderFinalOutput(pageContentsArray, outputFormat, outputArea, toggleEl
             outputArea.appendChild(pageDiv);
 
             // Add a delimiter between pages, but not after the last one
+            if (index < pageContentsArray.length - 1) {
+                const hr = document.createElement('hr');
+                hr.className = 'page-delimiter-hr';
+                outputArea.appendChild(hr);
+            }
+        });
+    } else if (format === 'json') {
+        pageContentsArray.forEach((pageContent, index) => {
+            const pre = document.createElement('pre');
+            const code = document.createElement('code');
+            code.className = 'language-json';
+
+            const stripped = pageContent.replace(/```json|```/g, '').trim();
+            let displayText = stripped;
+            try {
+                const parsed = JSON.parse(stripped);
+                displayText = JSON.stringify(parsed, null, 2);
+            } catch (_) {
+                // Not valid JSON yet — show raw text without highlight
+                pre.className = 'ocr-plaintext-content';
+                pre.textContent = stripped;
+                outputArea.appendChild(pre);
+                if (index < pageContentsArray.length - 1) {
+                    const hr = document.createElement('hr');
+                    hr.className = 'page-delimiter-hr';
+                    outputArea.appendChild(hr);
+                }
+                return;
+            }
+
+            if (typeof hljs !== 'undefined') {
+                code.innerHTML = hljs.highlight(displayText, { language: 'json' }).value;
+            } else {
+                code.textContent = displayText;
+            }
+            pre.appendChild(code);
+            outputArea.appendChild(pre);
+
             if (index < pageContentsArray.length - 1) {
                 const hr = document.createElement('hr');
                 hr.className = 'page-delimiter-hr';

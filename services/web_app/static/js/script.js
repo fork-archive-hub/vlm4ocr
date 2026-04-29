@@ -16,11 +16,28 @@ document.addEventListener('DOMContentLoaded', function () {
     const ocrToggleContainer = document.getElementById('ocr-toggle-container');
     const outputHeader = document.getElementById('output-header');
 
+    // --- JSON UX helper ---
+    function applyJsonUx(formatValue, detailsId, requiredHintId, optionalHintId, textareaId) {
+        const isJson = formatValue === 'JSON';
+        const details = document.getElementById(detailsId);
+        const requiredHint = document.getElementById(requiredHintId);
+        const optionalHint = document.getElementById(optionalHintId);
+        const textarea = document.getElementById(textareaId);
+
+        if (details && isJson) details.open = true;
+        if (requiredHint) requiredHint.style.display = isJson ? 'inline' : 'none';
+        if (optionalHint) optionalHint.style.display = isJson ? 'none' : 'inline';
+        if (textarea) textarea.placeholder = isJson
+            ? 'Required: describe the JSON schema (e.g., {"patient_name": str, "dob": str})'
+            : "Provide context about the image/PDF (e.g., 'This is a doctor\\'s note')";
+    }
+
     // --- Event Listener for Output Format Change ---
     if (outputFormatSelect) {
         outputFormatSelect.addEventListener('change', function() {
             currentOutputFormat = this.value;
             updatePreviewIcon(currentOutputFormat);
+            applyJsonUx(this.value, 'single-advanced-settings', 'single-user-prompt-required', 'single-user-prompt-optional', 'ocr-user-prompt');
             if (pageContentsArray.length > 0) {
                 // Pass the element itself
                 renderFinalOutput(pageContentsArray, currentOutputFormat, ocrOutputArea, ocrRenderToggle);
@@ -41,6 +58,15 @@ document.addEventListener('DOMContentLoaded', function () {
             // If already running, abort it
             if (singleOcrAbortController) {
                 singleOcrAbortController.abort();
+                return;
+            }
+
+            // Validate: JSON format requires a non-empty user prompt
+            const selectedFormat = document.getElementById('output-format-select').value;
+            const userPromptValue = (document.getElementById('ocr-user-prompt').value || '').trim();
+            if (selectedFormat === 'JSON' && userPromptValue === '') {
+                ocrOutputArea.innerHTML = '<p class="ocr-status-message ocr-status-error">User Prompt is required when using JSON output. Please describe the JSON schema in the Advanced OCR Settings.</p>';
+                document.getElementById('single-advanced-settings').open = true;
                 return;
             }
 
@@ -121,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const batchForm = document.getElementById('batch-ocr-form');
     const batchFileInput = document.getElementById('batch-input-file');
     const batchVlmApiSelect = document.getElementById('batch-vlm-api-select');
+    const batchOutputFormatSelect = document.getElementById('batch-output-format-select');
     const batchInputFileListArea = document.getElementById('batch-input-file-list-area');
     const batchOutputFileListhArea = document.getElementById('batch-output-file-list-area');
     const runBatchOcrButton = document.getElementById('run-batch-ocr-button');
@@ -137,6 +164,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (batchVlmApiSelect) {
         batchVlmApiSelect.addEventListener('change', handleBatchVlmApiChange);
+    }
+
+    if (batchOutputFormatSelect) {
+        batchOutputFormatSelect.addEventListener('change', function() {
+            applyJsonUx(this.value, 'batch-advanced-settings', 'batch-user-prompt-required', 'batch-user-prompt-optional', 'batch-ocr-user-prompt');
+        });
     }
 
     if (batchFileInput) {
@@ -251,6 +284,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (totalFiles === 0) {
             alert("Please select files to process.");
+            return;
+        }
+
+        // Validate: JSON format requires a non-empty user prompt
+        const batchSelectedFormat = formData.get('output_format');
+        const batchUserPrompt = (formData.get('user_prompt') || '').trim();
+        if (batchSelectedFormat === 'JSON' && batchUserPrompt === '') {
+            batchOutputFileListhArea.innerHTML = '<p class="ocr-status-message ocr-status-error">User Prompt is required when using JSON output. Please describe the JSON schema in the Advanced OCR Settings.</p>';
+            document.getElementById('batch-advanced-settings').open = true;
             return;
         }
 
