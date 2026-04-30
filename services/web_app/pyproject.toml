@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "web_app"
-version = "0.0.2"
+version = "0.0.3"
 description = "Web App for vlm4ocr project."
 authors = ["Enshuo (David) Hsu"]
 license = "MIT"
