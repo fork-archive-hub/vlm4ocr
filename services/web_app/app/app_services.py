@@ -280,7 +280,7 @@ def process_batch_ocr_stream(batch_id, base_url):
                                     f.write(output_content)
                                 q.put(json.dumps({'type': 'result', 'filename': output_filename}))
                             else:
-                                error_data = getattr(result, 'error_message', 'Unknown error.')
+                                error_data = result.pages and result.pages[0].get('text') or 'Unknown error.'
                                 q.put(json.dumps({'type': 'error', 'filename': Path(result.filename).name, 'data': error_data}))
                     finally:
                         await response_generator.aclose()
