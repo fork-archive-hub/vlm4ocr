@@ -835,6 +835,22 @@ a.list-group-item-action:hover {
 }
 
 /* JSON output hints */
+.batch-remove-file-btn:hover {
+    color: #ff6b6b;
+}
+.batch-remove-file-btn:disabled {
+    color: #555;
+    cursor: not-allowed;
+}
+
+.batch-remove-all-btn:hover {
+    background: #c82333;
+}
+.batch-remove-all-btn:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
 .json-required-hint {
     color: #e74c3c;
     font-weight: normal;

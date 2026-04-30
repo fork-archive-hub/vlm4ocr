@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let batchEventSource = null;
     let currentBatchId = null;
     let isBatchRunning = false;
+    let batchDataTransfer = new DataTransfer();
 
     // =================================================================
     // == Event Listeners for Batch Tab
@@ -173,7 +174,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (batchFileInput) {
-        batchFileInput.addEventListener('change', updateBatchFileList);
+        batchFileInput.addEventListener('change', function () {
+            const maxFiles = parseInt(batchFileInput.getAttribute('data-max-files'), 10) || 100;
+            const newFiles = Array.from(batchFileInput.files);
+            const currentCount = batchDataTransfer.files.length;
+
+            if (currentCount + newFiles.length > maxFiles) {
+                alert(`You can only select a maximum of ${maxFiles} files.`);
+                batchFileInput.value = '';
+                return;
+            }
+
+            for (const file of newFiles) {
+                batchDataTransfer.items.add(file);
+            }
+
+            // Reset the input so the same file can be selected again
+            batchFileInput.value = '';
+            renderBatchFileList();
+        });
     }
 
     if (batchForm) {
@@ -201,6 +220,8 @@ document.addEventListener('DOMContentLoaded', function () {
             runBatchOcrButton.classList.remove('btn-stop');
             runBatchOcrButton.innerHTML = originalBatchButtonText;
         }
+        // Re-render file list to reflect disabled/enabled state of remove buttons
+        renderBatchFileList();
     }
 
     function stopBatchOcr() {
@@ -233,37 +254,77 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function updateBatchFileList() {
-        if (!batchInputFileListArea || !batchFileInput.files) return;
-
-        const maxFiles = parseInt(batchFileInput.getAttribute('data-max-files'), 10) || 100;
-        if (batchFileInput.files.length > maxFiles) {
-            alert(`You can only select a maximum of ${maxFiles} files.`);
-            batchFileInput.value = '';
-            batchInputFileListArea.innerHTML = '<p class="ocr-status-message">Please select files (up to ' + maxFiles + ').</p>';
-            return;
-        }
+    function renderBatchFileList() {
+        if (!batchInputFileListArea) return;
 
         batchInputFileListArea.innerHTML = '';
 
-        if (batchFileInput.files.length === 0) {
+        if (batchDataTransfer.files.length === 0) {
             batchInputFileListArea.innerHTML = '<p class="ocr-status-message">Uploaded files will be listed here.</p>';
             return;
         }
 
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+        const count = document.createElement('span');
+        count.style.cssText = 'font-size:0.85em;color:#888;';
+        count.textContent = batchDataTransfer.files.length + ' file(s)';
+        const removeAllBtn = document.createElement('button');
+        removeAllBtn.textContent = 'Remove All';
+        removeAllBtn.className = 'batch-remove-all-btn';
+        removeAllBtn.style.cssText = isBatchRunning
+            ? 'background:#555;color:#999;border:none;border-radius:3px;padding:3px 10px;cursor:not-allowed;font-size:0.85em;font-weight:bold;'
+            : 'background:#dc3545;color:#fff;border:none;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:0.85em;font-weight:bold;';
+        removeAllBtn.disabled = isBatchRunning;
+        removeAllBtn.addEventListener('click', function () {
+            batchDataTransfer = new DataTransfer();
+            renderBatchFileList();
+        });
+        header.appendChild(count);
+        header.appendChild(removeAllBtn);
+        batchInputFileListArea.appendChild(header);
+
         const list = document.createElement('div');
         list.className = 'list-group';
 
-        for (const file of batchFileInput.files) {
+        for (let i = 0; i < batchDataTransfer.files.length; i++) {
+            const file = batchDataTransfer.files[i];
             const listItem = document.createElement('div');
             listItem.className = 'list-group-item';
+            listItem.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+            const nameSpan = document.createElement('span');
+            nameSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;';
             const icon = document.createElement('i');
             icon.className = 'fas fa-file-alt me-2';
-            listItem.appendChild(icon);
-            listItem.appendChild(document.createTextNode(` ${file.name}`));
+            nameSpan.appendChild(icon);
+            nameSpan.appendChild(document.createTextNode(file.name));
+            const removeBtn = document.createElement('button');
+            removeBtn.innerHTML = '&times;';
+            removeBtn.title = 'Remove';
+            removeBtn.className = 'batch-remove-file-btn';
+            removeBtn.style.cssText = isBatchRunning
+                ? 'background:none;border:none;color:#555;font-size:1.2em;cursor:not-allowed;padding:0 0 0 8px;line-height:1;flex-shrink:0;'
+                : 'background:none;border:none;color:#dc3545;font-size:1.2em;cursor:pointer;padding:0 0 0 8px;line-height:1;flex-shrink:0;';
+            removeBtn.disabled = isBatchRunning;
+            removeBtn.addEventListener('click', function () {
+                batchDataTransfer = removeFileFromDataTransfer(batchDataTransfer, i);
+                renderBatchFileList();
+            });
+            listItem.appendChild(nameSpan);
+            listItem.appendChild(removeBtn);
             list.appendChild(listItem);
         }
         batchInputFileListArea.appendChild(list);
+    }
+
+    function removeFileFromDataTransfer(dt, index) {
+        const newDataTransfer = new DataTransfer();
+        for (let i = 0; i < dt.files.length; i++) {
+            if (i !== index) {
+                newDataTransfer.items.add(dt.files[i]);
+            }
+        }
+        return newDataTransfer;
     }
 
     /**
@@ -280,7 +341,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const formData = new FormData(batchForm);
-        const totalFiles = batchFileInput.files.length;
+        // Remove the file input from FormData since it's always empty (cleared after each upload)
+        formData.delete('batch_input_files');
+        // Append accumulated files from batchDataTransfer
+        for (let i = 0; i < batchDataTransfer.files.length; i++) {
+            formData.append('batch_input_files', batchDataTransfer.files[i]);
+        }
+        const totalFiles = batchDataTransfer.files.length;
 
         if (totalFiles === 0) {
             alert("Please select files to process.");
