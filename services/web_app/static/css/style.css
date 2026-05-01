@@ -863,6 +863,244 @@ a.list-group-item-action:hover {
     opacity: 0.75;
 }
 
+/* ===== Markdown Prompt Editor ===== */
+
+.prompt-editor-wrapper {
+    position: relative;
+}
+
+.prompt-highlight-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 1em;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow: hidden;
+    pointer-events: none;
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    box-sizing: border-box;
+    color: #e0e0e0;
+    z-index: 0;
+}
+
+.md-highlight-textarea {
+    position: relative;
+    z-index: 1;
+    background: transparent !important;
+    color: transparent !important;
+    caret-color: #e0e0e0 !important;
+    font-size: 1em !important;
+    line-height: 1.6 !important;
+}
+
+.md-highlight-textarea::placeholder {
+    color: #777;
+    opacity: 1;
+}
+
+.prompt-expand-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    z-index: 2;
+    background: rgba(40, 40, 40, 0.85);
+    border: 1px solid #666;
+    color: #aaa;
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: 3px;
+    font-size: 0.72em;
+    line-height: 1;
+    transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.prompt-expand-btn:hover {
+    color: #4da6ff;
+    border-color: #4da6ff;
+    background: rgba(77, 166, 255, 0.12);
+}
+
+/* Markdown token colors — VS Code Dark+ inspired */
+.md-heading          { color: #569cd6; }
+.md-blockquote       { color: #6a9955; font-style: italic; }
+.md-hr               { color: #666; }
+.md-list-marker      { color: #4ec9b0; }
+.md-bold             { color: #dcdcaa; text-shadow: 0.4px 0 0 #dcdcaa, -0.4px 0 0 #dcdcaa; }
+.md-bold-italic      { color: #dcdcaa; text-shadow: 0.4px 0 0 #dcdcaa, -0.4px 0 0 #dcdcaa; font-style: italic; }
+.md-italic           { color: #d7ba7d; font-style: italic; }
+.md-code             { color: #ce9178; }
+.md-link             { color: #9cdcfe; }
+
+/* Fenced code block */
+.md-fence            { color: #569cd6; }
+.md-code-block       { color: #d4d4d4; }
+
+/* JSON syntax tokens (color-only — no font-weight to avoid cursor drift) */
+.json-key            { color: #9cdcfe; }
+.json-string         { color: #ce9178; }
+.json-number         { color: #b5cea8; }
+.json-keyword        { color: #569cd6; }
+.json-brace          { color: #ffd700; }
+.json-punct          { color: #d4d4d4; }
+
+/* ===== Prompt Expand Modal ===== */
+
+.prompt-modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.prompt-modal-container {
+    background: #252525;
+    border: 1px solid #444;
+    border-radius: 6px;
+    width: 72%;
+    max-width: 860px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.prompt-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+}
+
+.prompt-modal-title {
+    color: #e0e0e0;
+    font-weight: bold;
+    font-size: 0.95em;
+}
+
+.prompt-modal-close-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 1em;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: color 0.2s ease;
+    line-height: 1;
+}
+
+.prompt-modal-close-btn:hover {
+    color: #e0e0e0;
+}
+
+.prompt-modal-body {
+    flex-grow: 1;
+    padding: 14px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.prompt-modal-editor {
+    flex: 1;
+    position: relative;
+    min-height: 280px;
+}
+
+.prompt-modal-editor .prompt-highlight-backdrop {
+    border-color: #555;
+}
+
+#modal-prompt-textarea {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    background: transparent !important;
+    color: transparent !important;
+    caret-color: #e0e0e0 !important;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 1em;
+    line-height: 1.6;
+    resize: none;
+    box-sizing: border-box;
+    z-index: 1;
+}
+
+#modal-prompt-textarea::placeholder {
+    color: #777;
+    opacity: 1;
+}
+
+#modal-prompt-textarea:focus {
+    outline: none;
+    border-color: #4da6ff;
+    box-shadow: 0 0 0 2px rgba(77, 166, 255, 0.3);
+}
+
+.prompt-modal-editor .prompt-highlight-backdrop {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.prompt-modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 12px 16px;
+    border-top: 1px solid #444;
+    flex-shrink: 0;
+}
+
+#prompt-modal-apply-btn {
+    background-color: #4da6ff;
+    color: #1a1a1a;
+    border: none;
+    padding: 7px 20px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+
+#prompt-modal-apply-btn:hover {
+    background-color: #77c6ff;
+}
+
+#prompt-modal-cancel-btn {
+    background-color: #3a3a3a;
+    color: #ccc;
+    border: 1px solid #555;
+    padding: 7px 20px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+
+#prompt-modal-cancel-btn:hover {
+    background-color: #4a4a4a;
+}
+
 /* JSON syntax highlight block */
 pre:has(code.language-json) {
     background: #f6f8fa;

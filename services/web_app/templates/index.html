@@ -107,7 +107,11 @@
                         <div class="indented-option">
                             <div class="form-group">
                                 <label for="ocr-user-prompt">User Prompt <span id="single-user-prompt-required" class="json-required-hint" style="display:none;">(Required for JSON — describe the output schema)</span><span id="single-user-prompt-optional" class="json-optional-hint">(Optional Context)</span>:</label>
-                                <textarea id="ocr-user-prompt" name="user_prompt" rows="3" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
+                                <div class="prompt-editor-wrapper">
+                                    <button type="button" class="prompt-expand-btn" data-target="ocr-user-prompt" title="Expand editor"><i class="fas fa-expand-alt"></i></button>
+                                    <div class="prompt-highlight-backdrop" id="ocr-user-prompt-backdrop"></div>
+                                    <textarea id="ocr-user-prompt" name="user_prompt" rows="3" class="md-highlight-textarea" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="max-new-tokens">Max New Tokens:</label>
@@ -266,7 +270,11 @@
                         <div class="indented-option">
                             <div class="form-group">
                                 <label for="batch-ocr-user-prompt">User Prompt <span id="batch-user-prompt-required" class="json-required-hint" style="display:none;">(Required for JSON — describe the output schema)</span><span id="batch-user-prompt-optional" class="json-optional-hint">(Optional Context)</span>:</label>
-                                <textarea id="batch-ocr-user-prompt" name="user_prompt" rows="3" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
+                                <div class="prompt-editor-wrapper">
+                                    <button type="button" class="prompt-expand-btn" data-target="batch-ocr-user-prompt" title="Expand editor"><i class="fas fa-expand-alt"></i></button>
+                                    <div class="prompt-highlight-backdrop" id="batch-ocr-user-prompt-backdrop"></div>
+                                    <textarea id="batch-ocr-user-prompt" name="user_prompt" rows="3" class="md-highlight-textarea" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="batch-max-new-tokens">Max New Tokens:</label>
@@ -314,4 +322,24 @@
         </div>
     </div>
     </div>
+
+<!-- Prompt Expand Modal -->
+<div id="prompt-expand-modal" class="prompt-modal-overlay" style="display: none;">
+    <div class="prompt-modal-container">
+        <div class="prompt-modal-header">
+            <span class="prompt-modal-title">User Prompt</span>
+            <button type="button" id="prompt-modal-close-btn" class="prompt-modal-close-btn" title="Close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="prompt-modal-body">
+            <div class="prompt-modal-editor">
+                <div class="prompt-highlight-backdrop" id="modal-prompt-backdrop"></div>
+                <textarea id="modal-prompt-textarea" placeholder="Provide context about the image/PDF (e.g., 'This is a doctor's note')"></textarea>
+            </div>
+        </div>
+        <div class="prompt-modal-footer">
+            <button type="button" id="prompt-modal-cancel-btn">Cancel</button>
+            <button type="button" id="prompt-modal-apply-btn">Apply</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
